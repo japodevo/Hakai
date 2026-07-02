@@ -1,18 +1,43 @@
-# app/ — Vite + React PWA (M2+)
+# app/ — Vite + React PWA (M2)
 
-Empty until **M2**. This is the installable, offline-first PWA that renders the real
-bathymetry tiles from `pipeline/`, runs terrain analysis + scoring on device, shows tide
-windows, and keeps a catch log.
+The installable, offline-first chart app. Renders the pipeline's real bathy tiles,
+pans/zooms, shows a GPS own-ship marker, and (next milestones) scores structure, shows
+tide windows, and logs catches.
 
-Planned stack (see `CLAUDE.md`): Vite + React, `vite-plugin-pwa` / Workbox for
-service-worker precache of shell + tiles, IndexedDB for the catch log,
-`navigator.storage.persist()` on install, `navigator.geolocation` for the GPS marker.
+## Prerequisites
 
-M2 kickoff (next session, roughly):
+1. **Generate the data first** (see `../pipeline/`): `build_bathy.py` + `make_tiles.py`
+   must have produced `../data/tiles/`. `sync-data.sh` copies it into `public/data/`.
+2. **Node 18+**. Installing pulls ~200–300 MB of `node_modules` — make sure you have
+   the disk headroom (the pipeline Mac was tight).
+
+## Run
+
 ```bash
 cd app
-npm create vite@latest . -- --template react
-npm i -D vite-plugin-pwa
+npm install
+npm run dev            # http://localhost:5173  (also on your phone via the LAN URL Vite prints)
 ```
-Then port the prototype's canvas renderer onto the real tiles + manifest and add
-pan/zoom and the own-ship marker.
+
+`npm run dev` runs `sync-data.sh` first, so regenerate + re-sync whenever the tiles
+change. To test the **offline / installable** build:
+
+```bash
+npm run build && npm run preview
+# open the preview URL, then toggle airplane mode / DevTools "Offline" — it still loads
+```
+
+## What's here (M2)
+
+- `src/chart/ChartCanvas.jsx` — canvas renderer: pre-renders each tile, pans/zooms via
+  pointer + wheel + pinch, draws the GPS marker, tap-to-read depth/position/source.
+- `src/chart/proj.js` — UTM 9N ↔ WGS84 (verified round-trip) + depth colormap.
+- `src/chart/tiles.js` — loads/gunzips tiles, applies low-confidence fill shading.
+- `src/chart/useGeolocation.js` — GPS watch (works offline).
+- PWA: `vite-plugin-pwa` precaches shell + all tiles; `storage.persist()` on load.
+
+## Not yet (later milestones)
+
+M3 scoring + spot pins, M4 tide windows, M5 catch log, M6 offline hardening + the
+airplane-mode acceptance test. The richer renderer bits (hillshade, contours, soundings)
+port from `../prototype/` once it's added.

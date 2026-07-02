@@ -25,7 +25,7 @@ data/              generated tiles + manifests (mostly gitignored)
 | Milestone | Scope | State |
 |-----------|-------|-------|
 | **M1** | Pipeline: real NONNA tiles render in a throwaway HTML viewer | **✅ done** — WCS fetch → UTM 9N mosaic → 46 gzip tiles (3497×3380 @ 10 m) render in the viewer; ~59% modern-survey coverage of the AOI (rest = land / no survey) |
-| M2 | App shell: Vite PWA, chart renderer, pan/zoom, GPS marker | not started |
+| **M2** | App shell: Vite PWA, chart renderer, pan/zoom, GPS marker | **in progress** — Vite+React PWA scaffolded; canvas renderer (pan/zoom/pinch), GPS own-ship marker, tap-to-read depth/source, `storage.persist()`. Needs `npm install` + run on the Mac |
 | M3 | Scoring on real data: species chips, ranked pins, spot cards | not started |
 | M4 | Tides: prefetch + window strip + spot×tide recs (`fetch_tides.py` already drafted) | not started |
 | M5 | Catch log + export | not started |

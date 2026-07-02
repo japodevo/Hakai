@@ -1,0 +1,42 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1622;
+  --panel: #10202f;
+  --line: #1d3346;
+  --text: #cfe3f2;
+  --muted: #8fb3cc;
+  --warn: #ffcf6b;
+  --accent: #8fd0ff;
+  /* safe-area insets for the notch / home indicator on iPhone */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.4 -apple-system, system-ui, sans-serif;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 48px;          /* big touch target */
+  min-width: 48px;
+  padding: 0 16px;
+  cursor: pointer;
+}
+button:active { background: #17324a; }
+button.primary { background: #1b4c72; border-color: #2f7bb0; }

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#0b1622"/>
+  <!-- depth bands -->
+  <path d="M0 300 Q128 260 256 300 T512 300 V512 H0 Z" fill="#12314a"/>
+  <path d="M0 360 Q128 330 256 360 T512 360 V512 H0 Z" fill="#1b4c72"/>
+  <path d="M0 420 Q128 396 256 420 T512 420 V512 H0 Z" fill="#2f7bb0"/>
+  <!-- pinnacle / structure marker -->
+  <path d="M256 120 L316 300 H196 Z" fill="#8fd0ff"/>
+  <circle cx="256" cy="300" r="20" fill="#ffcf6b"/>
+</svg>
