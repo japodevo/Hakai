@@ -44,8 +44,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--in", dest="inp", type=Path,
-                    default=Path("data/derived/bathy_utm9n.tif"))
-    ap.add_argument("--out-dir", type=Path, default=Path("data/tiles"))
+                    default=aoi.DATA_DIR / "derived/bathy_utm9n.tif")
+    ap.add_argument("--out-dir", type=Path, default=aoi.DATA_DIR / "tiles")
     ap.add_argument("--tile", type=int, default=aoi.TILE_PX)
     ap.add_argument("--layer", default="bathy", help="manifest layer name")
     args = ap.parse_args()

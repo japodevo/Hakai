@@ -10,6 +10,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
+
+# --- Paths ------------------------------------------------------------------
+# Anchor all data paths to the repo root (this file lives in pipeline/), so the
+# scripts write to <repo>/data/ no matter which directory they're launched from.
+# The throwaway viewer and the repo layout both expect data/ at the repo root.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 
 # --- Area of interest (from CLAUDE.md) --------------------------------------
 # Hakai Passage, Pruth Bay, Calvert/Hecate shorelines, adjacent banks.

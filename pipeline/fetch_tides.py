@@ -119,7 +119,7 @@ def main() -> None:
     ap.add_argument("--to", dest="date_to", required=True, help="YYYY-MM-DD")
     ap.add_argument("--buffer", type=int, default=3, help="buffer days each side")
     ap.add_argument("--station-id", default=None, help="skip nearest-station lookup")
-    ap.add_argument("--out", type=Path, default=Path("data/tides.json"))
+    ap.add_argument("--out", type=Path, default=aoi.DATA_DIR / "tides.json")
     args = ap.parse_args()
 
     d0 = dt.datetime.strptime(args.date_from, "%Y-%m-%d")

@@ -229,8 +229,8 @@ def main() -> None:
     ap.add_argument("--source", choices=["local", "wcs"], default="local")
     ap.add_argument("--res", type=float, default=aoi.DEFAULT_RES_M,
                     help="output resolution in metres (10 default, 20 halves size)")
-    ap.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
-    ap.add_argument("--out", type=Path, default=Path("data/derived/bathy_utm9n.tif"))
+    ap.add_argument("--raw-dir", type=Path, default=aoi.DATA_DIR / "raw")
+    ap.add_argument("--out", type=Path, default=aoi.DATA_DIR / "derived/bathy_utm9n.tif")
     ap.add_argument("--wcs-url", default=aoi.NONNA_WCS_URL)
     ap.add_argument("--coverage-id", default=None,
                     help="WCS coverageId (discover via --list-coverages)")
