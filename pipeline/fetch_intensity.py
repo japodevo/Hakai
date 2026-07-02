@@ -25,7 +25,7 @@ import numpy as np
 
 import hakai_aoi as aoi
 # Reuse the exact WCS discovery + fetch machinery from the bathy script.
-from fetch_bathy import (list_coverages, describe_coverage, fetch_wcs_subtiles)
+from fetch_bathy import (list_coverages, describe_coverage, fetch_wcs)
 
 CLASS_NODATA, CLASS_SOFT, CLASS_GRAVEL, CLASS_ROCK = 0, 1, 2, 3
 
@@ -100,8 +100,10 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=Path("data/derived/bottom_utm9n.tif"))
     ap.add_argument("--wcs-url", default=aoi.NONNA_WCS_URL)
     ap.add_argument("--coverage-id", default=None)
-    ap.add_argument("--axis-lon", default="Long")
-    ap.add_argument("--axis-lat", default="Lat")
+    ap.add_argument("--native-epsg", type=int, default=3857)
+    ap.add_argument("--axis-x", default="x")
+    ap.add_argument("--axis-y", default="y")
+    ap.add_argument("--format", dest="fmt", default="image/tiff")
     ap.add_argument("--list-coverages", action="store_true")
     ap.add_argument("--describe", metavar="COVERAGE_ID", default=None)
     ap.add_argument("--soft-max", type=float, default=None,
@@ -121,8 +123,8 @@ def main() -> None:
     if args.source == "wcs":
         if not args.coverage_id:
             raise SystemExit("--source wcs needs --coverage-id (try --list-coverages).")
-        rasters = fetch_wcs_subtiles(args.wcs_url, args.coverage_id, args.raw_dir,
-                                     args.axis_lon, args.axis_lat)
+        rasters = fetch_wcs(args.wcs_url, args.coverage_id, args.raw_dir,
+                            args.native_epsg, args.axis_x, args.axis_y, args.fmt)
     else:
         rasters = sorted(args.raw_dir.glob("*.tif")) + sorted(args.raw_dir.glob("*.tiff"))
         print(f"[local] {len(rasters)} intensity GeoTIFF(s) in {args.raw_dir}")

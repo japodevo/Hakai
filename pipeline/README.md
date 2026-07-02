@@ -23,14 +23,18 @@ source .venv/bin/activate
   # python3 fetch_bathy.py --source local --res 20   # half the size
   ```
 
-- **WCS (no download, best-effort).** The GeoServer coverage id / axis labels vary,
-  so discover them first:
+- **WCS (no download, no account).** Confirmed working against the NONNA GeoServer,
+  which serves NONNA-10 in EPSG:3857 (Web Mercator). List the layers, then fetch the
+  whole AOI in one request:
   ```bash
   python3 fetch_bathy.py --list-coverages
-  python3 fetch_bathy.py --describe <coverageId>
-  python3 fetch_bathy.py --source wcs --coverage-id <coverageId> \
-      --axis-lat Lat --axis-lon Long
+  # -> nonna__NONNA 10 Coverage   (the 10 m grid)
+  #    nonna__NONNA 100 Coverage  (coarser 100 m)
+  python3 fetch_bathy.py --source wcs --coverage-id "nonna__NONNA 10 Coverage"
   ```
+  Defaults assume the 3857 / `x`,`y` axis layout. If a differently-configured server
+  rejects the request, inspect it with `--describe "<coverageId>"` and override
+  `--native-epsg` / `--axis-x` / `--axis-y` / `--format image/geotiff`.
 
 Output → `../data/derived/bathy_utm9n.tif` (Float32, metres, nodata −9999).
 

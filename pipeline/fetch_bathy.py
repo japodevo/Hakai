@@ -67,38 +67,47 @@ def describe_coverage(wcs_url: str, coverage_id: str) -> str:
     return r.text
 
 
-def fetch_wcs_subtiles(wcs_url: str, coverage_id: str, raw_dir: Path,
-                       axis_lon: str, axis_lat: str) -> list[Path]:
-    """GetCoverage each 0.1° subtile of the AOI as a GeoTIFF into raw_dir."""
+def aoi_in_native(native_epsg: int) -> tuple[float, float, float, float]:
+    """Project the AOI lon/lat corners into the coverage's native CRS.
+
+    The NONNA GeoServer serves NONNA-10 in EPSG:3857 (Web Mercator, axes 'x y'
+    in metres), so WCS subsets have to be given in native metres, not lat/long.
+    """
+    from rasterio.warp import transform
+    b = aoi.aoi_bbox()
+    xs, ys = transform(f"EPSG:{aoi.WGS84_EPSG}", f"EPSG:{native_epsg}",
+                       [b.lon_min, b.lon_max, b.lon_min, b.lon_max],
+                       [b.lat_min, b.lat_min, b.lat_max, b.lat_max])
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def fetch_wcs(wcs_url: str, coverage_id: str, raw_dir: Path, native_epsg: int,
+              axis_x: str, axis_y: str, fmt: str) -> list[Path]:
+    """GetCoverage the whole AOI in one request, in the coverage's native CRS.
+
+    One request (not 24 subtiles): the AOI is small (~55x33 km), so a single window
+    is fewer round trips and less intermediate disk — reprojection to UTM 9N happens
+    locally in build_raster().
+    """
     raw_dir.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
-    tiles = aoi.subtile_bboxes(aoi.aoi_bbox())
-    print(f"[wcs] {len(tiles)} subtiles for AOI {aoi.aoi_bbox()}")
-    for i, b in enumerate(tiles):
-        out = raw_dir / f"nonna10_{b.lat_min:.1f}N_{abs(b.lon_min):.1f}W.tif"
-        if out.exists() and out.stat().st_size > 0:
-            written.append(out)
-            continue
-        params = {
-            "service": "WCS", "version": "2.0.1", "request": "GetCoverage",
-            "coverageId": coverage_id, "format": "image/geotiff",
-            # WCS 2.0.1 subset syntax; axis labels come from DescribeCoverage.
-            "subset": [f"{axis_lat}({b.lat_min},{b.lat_max})",
-                       f"{axis_lon}({b.lon_min},{b.lon_max})"],
-        }
-        try:
-            r = _get(wcs_url, params)
-            ctype = r.headers.get("content-type", "")
-            if "xml" in ctype.lower():
-                # GeoServer returns an ExceptionReport as XML on error.
-                print(f"[wcs] subtile {i} error:\n{r.text[:600]}", file=sys.stderr)
-                continue
-            out.write_bytes(r.content)
-            written.append(out)
-            print(f"[wcs] {out.name} ({len(r.content)//1024} KB)")
-        except Exception as e:  # noqa: BLE001 — keep going, report at the end
-            print(f"[wcs] subtile {i} failed: {e}", file=sys.stderr)
-    return written
+    xmin, ymin, xmax, ymax = aoi_in_native(native_epsg)
+    out = raw_dir / "nonna10_aoi.tif"
+    params = {
+        "service": "WCS", "version": "2.0.1", "request": "GetCoverage",
+        "coverageId": coverage_id, "format": fmt,
+        # Native-CRS trim: values are EPSG:3857 metres, axis labels 'x'/'y'.
+        "subset": [f"{axis_x}({xmin},{xmax})", f"{axis_y}({ymin},{ymax})"],
+    }
+    print(f"[wcs] GetCoverage {coverage_id} over AOI "
+          f"x[{xmin:.0f},{xmax:.0f}] y[{ymin:.0f},{ymax:.0f}] EPSG:{native_epsg}")
+    r = _get(wcs_url, params)
+    ctype = r.headers.get("content-type", "")
+    if "xml" in ctype.lower() or "html" in ctype.lower():
+        # GeoServer returns an ExceptionReport (XML) on error — surface it.
+        raise SystemExit(f"[wcs] GeoServer error:\n{r.text[:1200]}")
+    out.write_bytes(r.content)
+    print(f"[wcs] wrote {out} ({len(r.content)/1e6:.1f} MB)")
+    return [out]
 
 
 # --------------------------------------------------------------------------- #
@@ -117,7 +126,8 @@ def build_raster(rasters: list[Path], out_path: Path, res_m: float) -> None:
 
     srcs = [rasterio.open(p) for p in rasters]
     try:
-        # 1) Mosaic in whatever CRS the inputs use (NONNA export is geographic WGS84).
+        # 1) Mosaic in whatever CRS the inputs use (WCS = EPSG:3857; portal export
+        #    may be WGS84). Reprojection to UTM 9N happens below regardless.
         mosaic, mosaic_transform = merge(srcs, nodata=srcs[0].nodata)
         src_crs = srcs[0].crs
         src_nodata = srcs[0].nodata
@@ -179,8 +189,12 @@ def main() -> None:
     ap.add_argument("--wcs-url", default=aoi.NONNA_WCS_URL)
     ap.add_argument("--coverage-id", default=None,
                     help="WCS coverageId (discover via --list-coverages)")
-    ap.add_argument("--axis-lon", default="Long", help="WCS subset axis label for longitude")
-    ap.add_argument("--axis-lat", default="Lat", help="WCS subset axis label for latitude")
+    ap.add_argument("--native-epsg", type=int, default=3857,
+                    help="coverage native CRS (NONNA GeoServer = 3857 Web Mercator)")
+    ap.add_argument("--axis-x", default="x", help="WCS subset axis label for easting")
+    ap.add_argument("--axis-y", default="y", help="WCS subset axis label for northing")
+    ap.add_argument("--format", dest="fmt", default="image/tiff",
+                    help="WCS output format (try image/geotiff if image/tiff is rejected)")
     ap.add_argument("--list-coverages", action="store_true")
     ap.add_argument("--describe", metavar="COVERAGE_ID", default=None)
     args = ap.parse_args()
@@ -197,8 +211,8 @@ def main() -> None:
         if not args.coverage_id:
             raise SystemExit("--source wcs needs --coverage-id "
                              "(run --list-coverages first).")
-        rasters = fetch_wcs_subtiles(args.wcs_url, args.coverage_id, args.raw_dir,
-                                     args.axis_lon, args.axis_lat)
+        rasters = fetch_wcs(args.wcs_url, args.coverage_id, args.raw_dir,
+                            args.native_epsg, args.axis_x, args.axis_y, args.fmt)
     else:
         rasters = sorted(args.raw_dir.glob("*.tif")) + sorted(args.raw_dir.glob("*.tiff"))
         print(f"[local] {len(rasters)} GeoTIFF(s) in {args.raw_dir}")
