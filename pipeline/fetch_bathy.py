@@ -92,6 +92,10 @@ def fetch_wcs(wcs_url: str, coverage_id: str, raw_dir: Path, native_epsg: int,
     raw_dir.mkdir(parents=True, exist_ok=True)
     xmin, ymin, xmax, ymax = aoi_in_native(native_epsg)
     out = raw_dir / "nonna10_aoi.tif"
+    if out.exists() and out.stat().st_size > 0:
+        print(f"[wcs] reusing cached {out} ({out.stat().st_size/1e6:.1f} MB) — "
+              f"delete it to re-fetch")
+        return [out]
     params = {
         "service": "WCS", "version": "2.0.1", "request": "GetCoverage",
         "coverageId": coverage_id, "format": fmt,
@@ -113,7 +117,33 @@ def fetch_wcs(wcs_url: str, coverage_id: str, raw_dir: Path, native_epsg: int,
 # --------------------------------------------------------------------------- #
 # Mosaic + reproject + resample                                               #
 # --------------------------------------------------------------------------- #
-def build_raster(rasters: list[Path], out_path: Path, res_m: float) -> None:
+def _normalized_source(path, np, rasterio):
+    """Open a raster and return an in-memory copy whose nodata is a *representable*
+    sentinel (OUT_NODATA).
+
+    The NONNA WCS coverage tags nodata as FLT_MAX (3.4e38), which rasterio.merge
+    refuses to handle ("cannot safely be represented in float32") and silently
+    zeroes the whole mosaic. We mask nodata ourselves — FLT_MAX, the declared
+    nodata, and any non-finite — and rewrite it to OUT_NODATA before merging.
+    """
+    from rasterio.io import MemoryFile
+    with rasterio.open(path) as src:
+        a = src.read(1).astype("float32")
+        profile = src.profile
+    mask = ~np.isfinite(a) | (np.abs(a) >= 1e30)
+    nd = profile.get("nodata")
+    if nd is not None and abs(nd) < 1e30:
+        mask |= (a == np.float32(nd))
+    a[mask] = OUT_NODATA
+    profile.update(dtype="float32", nodata=OUT_NODATA, count=1)
+    memfile = MemoryFile()
+    ds = memfile.open(**profile)
+    ds.write(a, 1)
+    return memfile, ds
+
+
+def build_raster(rasters: list[Path], out_path: Path, res_m: float,
+                 sign: str = "auto") -> None:
     import numpy as np
     import rasterio
     from rasterio.merge import merge
@@ -124,18 +154,33 @@ def build_raster(rasters: list[Path], out_path: Path, res_m: float) -> None:
             "No input rasters. Put NONNA-10 GeoTIFFs in data/raw/ (--source local) "
             "or fetch via --source wcs. Nothing to mosaic.")
 
-    srcs = [rasterio.open(p) for p in rasters]
+    # Normalize each source's nodata to a representable sentinel first (see above),
+    # then mosaic. Works for a single WCS file or many portal-downloaded tiles.
+    handles = [_normalized_source(p, np, rasterio) for p in rasters]
+    memfiles = [m for m, _ in handles]
+    srcs = [d for _, d in handles]
     try:
-        # 1) Mosaic in whatever CRS the inputs use (WCS = EPSG:3857; portal export
-        #    may be WGS84). Reprojection to UTM 9N happens below regardless.
-        mosaic, mosaic_transform = merge(srcs, nodata=srcs[0].nodata)
+        mosaic, mosaic_transform = merge(srcs, nodata=OUT_NODATA)
         src_crs = srcs[0].crs
-        src_nodata = srcs[0].nodata
-        band = mosaic[0]
+        band = mosaic[0].astype("float32")
         h, w = band.shape
     finally:
         for s in srcs:
             s.close()
+        for m in memfiles:
+            m.close()
+    src_nodata = OUT_NODATA
+
+    # Sign convention: NONNA WCS returns *elevation* (negative = below datum), but the
+    # app wants positive-down depth. 'auto' flips when the surveyed median is negative;
+    # portal exports that are already positive-down are left alone.
+    valid_mask = band != OUT_NODATA
+    if valid_mask.any():
+        med = float(np.median(band[valid_mask]))
+        flip = (sign == "elevation") or (sign == "auto" and med < 0)
+        if flip:
+            band[valid_mask] = -band[valid_mask]
+            print(f"[bathy] flipped elevation->depth (median was {med:.1f} m)")
 
     # 2) Compute the UTM 9N transform at the requested ground resolution.
     dst_crs = rasterio.crs.CRS.from_epsg(aoi.UTM_9N_EPSG)
@@ -195,6 +240,10 @@ def main() -> None:
     ap.add_argument("--axis-y", default="y", help="WCS subset axis label for northing")
     ap.add_argument("--format", dest="fmt", default="image/tiff",
                     help="WCS output format (try image/geotiff if image/tiff is rejected)")
+    ap.add_argument("--sign", choices=["auto", "depth", "elevation"], default="auto",
+                    help="'elevation' (NONNA WCS, negative=underwater) is flipped to "
+                         "positive-down depth; 'depth' left as-is; 'auto' decides by "
+                         "the sign of the median")
     ap.add_argument("--list-coverages", action="store_true")
     ap.add_argument("--describe", metavar="COVERAGE_ID", default=None)
     args = ap.parse_args()
@@ -217,7 +266,7 @@ def main() -> None:
         rasters = sorted(args.raw_dir.glob("*.tif")) + sorted(args.raw_dir.glob("*.tiff"))
         print(f"[local] {len(rasters)} GeoTIFF(s) in {args.raw_dir}")
 
-    build_raster(rasters, args.out, args.res)
+    build_raster(rasters, args.out, args.res, args.sign)
 
 
 if __name__ == "__main__":
