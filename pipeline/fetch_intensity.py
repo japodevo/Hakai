@@ -123,7 +123,8 @@ def main() -> None:
     if args.source == "wcs":
         if not args.coverage_id:
             raise SystemExit("--source wcs needs --coverage-id (try --list-coverages).")
-        rasters = fetch_wcs(args.wcs_url, args.coverage_id, args.raw_dir,
+        rasters = fetch_wcs(args.wcs_url, args.coverage_id,
+                            args.raw_dir / "intensity_aoi.tif",
                             args.native_epsg, args.axis_x, args.axis_y, args.fmt)
     else:
         rasters = sorted(args.raw_dir.glob("*.tif")) + sorted(args.raw_dir.glob("*.tiff"))

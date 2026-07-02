@@ -81,7 +81,7 @@ def aoi_in_native(native_epsg: int) -> tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def fetch_wcs(wcs_url: str, coverage_id: str, raw_dir: Path, native_epsg: int,
+def fetch_wcs(wcs_url: str, coverage_id: str, out_path: Path, native_epsg: int,
               axis_x: str, axis_y: str, fmt: str) -> list[Path]:
     """GetCoverage the whole AOI in one request, in the coverage's native CRS.
 
@@ -89,9 +89,9 @@ def fetch_wcs(wcs_url: str, coverage_id: str, raw_dir: Path, native_epsg: int,
     is fewer round trips and less intermediate disk — reprojection to UTM 9N happens
     locally in build_raster().
     """
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    out = out_path
+    out.parent.mkdir(parents=True, exist_ok=True)
     xmin, ymin, xmax, ymax = aoi_in_native(native_epsg)
-    out = raw_dir / "nonna10_aoi.tif"
     if out.exists() and out.stat().st_size > 0:
         print(f"[wcs] reusing cached {out} ({out.stat().st_size/1e6:.1f} MB) — "
               f"delete it to re-fetch")
@@ -142,20 +142,41 @@ def _normalized_source(path, np, rasterio):
     return memfile, ds
 
 
-def build_raster(rasters: list[Path], out_path: Path, res_m: float,
-                 sign: str = "auto") -> None:
+def aoi_utm_grid(res_m: float):
+    """Canonical UTM 9N target grid for the AOI, snapped to the resolution.
+
+    Every source reprojects onto *this exact grid* so tiers line up cell-for-cell
+    and the output extent is deterministic (independent of each source's own extent).
+    Returns (transform, width, height, crs).
+    """
+    import math
+    import rasterio
+    from rasterio.transform import Affine
+    from rasterio.warp import transform_bounds
+    dst_crs = rasterio.crs.CRS.from_epsg(aoi.UTM_9N_EPSG)
+    left, bottom, right, top = transform_bounds(
+        f"EPSG:{aoi.WGS84_EPSG}", dst_crs,
+        aoi.AOI_LON_MIN, aoi.AOI_LAT_MIN, aoi.AOI_LON_MAX, aoi.AOI_LAT_MAX)
+    left = math.floor(left / res_m) * res_m
+    bottom = math.floor(bottom / res_m) * res_m
+    right = math.ceil(right / res_m) * res_m
+    top = math.ceil(top / res_m) * res_m
+    w = int(round((right - left) / res_m))
+    h = int(round((top - bottom) / res_m))
+    return Affine(res_m, 0, left, 0, -res_m, top), w, h, dst_crs
+
+
+def warp_to_grid(rasters: list[Path], grid, sign: str = "auto"):
+    """Normalize + mosaic + sign-fix a set of source rasters, reprojected onto ``grid``.
+
+    Returns a float32 array (nodata = OUT_NODATA) with positive-down depth.
+    """
     import numpy as np
     import rasterio
     from rasterio.merge import merge
-    from rasterio.warp import calculate_default_transform, reproject, Resampling
+    from rasterio.warp import reproject, Resampling
+    dst_transform, dst_w, dst_h, dst_crs = grid
 
-    if not rasters:
-        raise SystemExit(
-            "No input rasters. Put NONNA-10 GeoTIFFs in data/raw/ (--source local) "
-            "or fetch via --source wcs. Nothing to mosaic.")
-
-    # Normalize each source's nodata to a representable sentinel first (see above),
-    # then mosaic. Works for a single WCS file or many portal-downloaded tiles.
     handles = [_normalized_source(p, np, rasterio) for p in rasters]
     memfiles = [m for m, _ in handles]
     srcs = [d for _, d in handles]
@@ -163,59 +184,55 @@ def build_raster(rasters: list[Path], out_path: Path, res_m: float,
         mosaic, mosaic_transform = merge(srcs, nodata=OUT_NODATA)
         src_crs = srcs[0].crs
         band = mosaic[0].astype("float32")
-        h, w = band.shape
     finally:
         for s in srcs:
             s.close()
         for m in memfiles:
             m.close()
-    src_nodata = OUT_NODATA
 
-    # Sign convention: NONNA WCS returns *elevation* (negative = below datum), but the
-    # app wants positive-down depth. 'auto' flips when the surveyed median is negative;
-    # portal exports that are already positive-down are left alone.
-    valid_mask = band != OUT_NODATA
-    if valid_mask.any():
-        med = float(np.median(band[valid_mask]))
-        flip = (sign == "elevation") or (sign == "auto" and med < 0)
-        if flip:
-            band[valid_mask] = -band[valid_mask]
+    # Sign convention: NONNA WCS returns *elevation* (negative = below datum); the app
+    # wants positive-down depth. 'auto' flips when the surveyed median is negative.
+    valid = band != OUT_NODATA
+    if valid.any():
+        med = float(np.median(band[valid]))
+        if sign == "elevation" or (sign == "auto" and med < 0):
+            band[valid] = -band[valid]
             print(f"[bathy] flipped elevation->depth (median was {med:.1f} m)")
 
-    # 2) Compute the UTM 9N transform at the requested ground resolution.
-    dst_crs = rasterio.crs.CRS.from_epsg(aoi.UTM_9N_EPSG)
-    left = mosaic_transform.c
-    top = mosaic_transform.f
-    right = left + mosaic_transform.a * w
-    bottom = top + mosaic_transform.e * h
-    dst_transform, dst_w, dst_h = calculate_default_transform(
-        src_crs, dst_crs, w, h, left, bottom, right, top, resolution=res_m)
-
     dst = np.full((dst_h, dst_w), OUT_NODATA, dtype="float32")
-    reproject(
-        source=band.astype("float32"),
-        destination=dst,
-        src_transform=mosaic_transform, src_crs=src_crs,
-        src_nodata=src_nodata,
-        dst_transform=dst_transform, dst_crs=dst_crs,
-        dst_nodata=OUT_NODATA,
-        resampling=Resampling.bilinear,
-    )
+    reproject(source=band, destination=dst,
+              src_transform=mosaic_transform, src_crs=src_crs, src_nodata=OUT_NODATA,
+              dst_transform=dst_transform, dst_crs=dst_crs, dst_nodata=OUT_NODATA,
+              resampling=Resampling.bilinear)
+    return dst
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    profile = {
-        "driver": "GTiff", "dtype": "float32", "count": 1,
-        "width": dst_w, "height": dst_h,
-        "crs": dst_crs, "transform": dst_transform,
-        "nodata": OUT_NODATA, "compress": "deflate", "predictor": 2,
-        "tiled": True, "blockxsize": 512, "blockysize": 512,
-    }
-    with rasterio.open(out_path, "w", **profile) as d:
-        d.write(dst, 1)
+
+def write_gtiff(path: Path, arr, transform, crs, dtype="float32", nodata=OUT_NODATA):
+    import rasterio
+    path.parent.mkdir(parents=True, exist_ok=True)
+    profile = {"driver": "GTiff", "dtype": dtype, "count": 1,
+               "width": arr.shape[1], "height": arr.shape[0],
+               "crs": crs, "transform": transform, "nodata": nodata,
+               "compress": "deflate", "tiled": True,
+               "blockxsize": 512, "blockysize": 512}
+    with rasterio.open(path, "w", **profile) as d:
+        d.write(arr.astype(dtype), 1)
+
+
+def build_raster(rasters: list[Path], out_path: Path, res_m: float,
+                 sign: str = "auto") -> None:
+    if not rasters:
+        raise SystemExit(
+            "No input rasters. Put NONNA-10 GeoTIFFs in data/raw/ (--source local) "
+            "or fetch via --source wcs. Nothing to mosaic.")
+    grid = aoi_utm_grid(res_m)
+    dst = warp_to_grid(rasters, grid, sign)
+    transform, w, h, crs = grid
+    write_gtiff(out_path, dst, transform, crs)
 
     valid = dst[dst != OUT_NODATA]
     cov = 100.0 * valid.size / dst.size if dst.size else 0.0
-    print(f"[done] {out_path}  {dst_w}x{dst_h} @ {res_m} m  UTM9N")
+    print(f"[done] {out_path}  {w}x{h} @ {res_m} m  UTM9N")
     if valid.size:
         print(f"[done] depth range {valid.min():.1f}..{valid.max():.1f} m, "
               f"coverage {cov:.1f}% of AOI (rest = no modern survey)")
@@ -260,7 +277,8 @@ def main() -> None:
         if not args.coverage_id:
             raise SystemExit("--source wcs needs --coverage-id "
                              "(run --list-coverages first).")
-        rasters = fetch_wcs(args.wcs_url, args.coverage_id, args.raw_dir,
+        rasters = fetch_wcs(args.wcs_url, args.coverage_id,
+                            args.raw_dir / "nonna10_aoi.tif",
                             args.native_epsg, args.axis_x, args.axis_y, args.fmt)
     else:
         rasters = sorted(args.raw_dir.glob("*.tif")) + sorted(args.raw_dir.glob("*.tiff"))

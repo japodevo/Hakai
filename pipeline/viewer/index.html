@@ -40,6 +40,8 @@
     <span>deep</span>
     <span style="margin-left:16px"><span class="swatch"
       style="background:repeating-linear-gradient(45deg,#334,#334 2px,#0b1622 2px,#0b1622 4px)"></span>no modern survey</span>
+    <span id="fillLegend" style="margin-left:16px; display:none"><span class="swatch"
+      style="background:#5f7a90"></span>coarse fill (NONNA-100, low conf)</span>
     <span id="range" style="margin-left:16px"></span>
   </div>
   <div id="readout">move the cursor over the chart to read position + depth</div>
@@ -151,13 +153,21 @@ async function main() {
   const off = document.createElement('canvas');
   const octx = off.getContext('2d');
 
+  const hasSource = !!MANIFEST.source;
+  document.getElementById('fillLegend').style.display = hasSource ? '' : 'none';
+
   let dmin = Infinity, dmax = -Infinity, done = 0;
   for (const t of tiles) {
     try {
       const raw = await gunzip(await (await fetch(new URL(t.bin, MANIFEST_URL)))
         .arrayBuffer());
       const depths = new Int16Array(raw.buffer, raw.byteOffset, raw.byteLength / 2);
-      TILES.set(t.id, { depths, w: t.w, h: t.h, col: t.col, row: t.row });
+      let src = null;
+      if (t.src) {
+        src = await gunzip(await (await fetch(new URL(t.src, MANIFEST_URL)))
+          .arrayBuffer());  // Uint8, one source code per cell
+      }
+      TILES.set(t.id, { depths, src, w: t.w, h: t.h, col: t.col, row: t.row });
       off.width = t.w; off.height = t.h;
       const img = octx.createImageData(t.w, t.h);
       for (let i = 0; i < depths.length; i++) {
@@ -173,7 +183,14 @@ async function main() {
         } else {
           const m = dm / SCALE;
           if (m < dmin) dmin = m; if (m > dmax) dmax = m;
-          const [r, g, b] = depthColor(m);
+          let [r, g, b] = depthColor(m);
+          // Low-confidence fill (source code > 1, e.g. NONNA-100): desaturate toward
+          // grey so it never reads as high-res survey.
+          if (src && src[i] > 1) {
+            r = Math.round(r * 0.55 + 96 * 0.45);
+            g = Math.round(g * 0.55 + 110 * 0.45);
+            b = Math.round(b * 0.55 + 122 * 0.45);
+          }
           img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255;
         }
       }
@@ -212,17 +229,29 @@ function hover(ev, canvas) {
   const epsg = parseInt(String(crs).split(':')[1], 10);
   const [lon, lat] = utmToLonLat(E, N, epsg);
 
-  // depth from the retained tile array
+  // depth + provenance from the retained tile arrays
   const col = Math.floor(fx / tileSize), row = Math.floor(fy / tileSize);
   const t = TILES.get(`${MANIFEST.layer}_${col}_${row}`);
   let dtxt = '<b>no data</b> (land or no modern survey)';
+  let srctxt = '';
   if (t) {
     const lx = fx - col * tileSize, ly = fy - row * tileSize;
-    const dm = t.depths[ly * t.w + lx];
+    const idx = ly * t.w + lx;
+    const dm = t.depths[idx];
     if (dm !== depth.nodata) dtxt = `<b>${(dm / depth.scale).toFixed(1)} m</b>`;
+    if (t.src && MANIFEST.source) {
+      const code = t.src[idx];
+      const name = MANIFEST.source.legend[code] || 'unknown';
+      const conf = MANIFEST.source.confidence[code];
+      if (code > 0) {
+        const warn = conf === 'low';
+        srctxt = ` &nbsp;·&nbsp; <span style="color:${warn ? '#ffcf6b' : '#7fd6a0'}">`
+          + `${name}${conf ? ` (${conf} conf)` : ''}</span>`;
+      }
+    }
   }
   readout.innerHTML =
-    `${lat.toFixed(5)}, ${lon.toFixed(5)} &nbsp;·&nbsp; depth ${dtxt}`
+    `${lat.toFixed(5)}, ${lon.toFixed(5)} &nbsp;·&nbsp; depth ${dtxt}${srctxt}`
     + ` &nbsp;·&nbsp; <span style="color:#6f8ba3">UTM ${E.toFixed(0)}, ${N.toFixed(0)}</span>`;
 }
 main();

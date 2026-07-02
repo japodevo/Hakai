@@ -45,6 +45,23 @@ python3 make_tiles.py              # -> ../data/tiles/*.bin.gz + manifest.json
 Int16 decimetre tiles, 512×512, gzipped, with a per-tile coverage mask. Manifest is
 committed; the binaries are gitignored.
 
+### Tiered fill (NONNA-10 + NONNA-100)
+
+NONNA-10 is patchy (~59% of the AOI here). To stop gaps being black holes, build a
+**best-available mosaic** — NONNA-10 wins per cell, NONNA-100 fills the rest — with a
+per-cell *source* layer so coarse fill is flagged low-confidence and kept out of
+structure scoring:
+
+```bash
+python3 build_bathy.py             # -> derived/bathy_utm9n.tif + bathy_source_utm9n.tif
+python3 make_tiles.py              # now also emits *.src.gz + a source legend
+```
+
+`build_bathy.py` reuses the cached NONNA-10 download and fetches NONNA-100 from the
+same WCS (no extra account). The viewer desaturates NONNA-100 cells and the hover
+readout names the source + confidence. Higher-fidelity gap fill (CHS ENC charted
+soundings/contours) is the planned next tier.
+
 **3. View it (M1 acceptance).** From the **repo root**:
 ```bash
 python3 -m http.server 8000

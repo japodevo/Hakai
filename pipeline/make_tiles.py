@@ -45,6 +45,10 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--in", dest="inp", type=Path,
                     default=aoi.DATA_DIR / "derived/bathy_utm9n.tif")
+    ap.add_argument("--source-in", type=Path,
+                    default=aoi.DATA_DIR / "derived/bathy_source_utm9n.tif",
+                    help="optional per-cell source raster from build_bathy.py; if "
+                         "present, tiles carry provenance (which source filled each cell)")
     ap.add_argument("--out-dir", type=Path, default=aoi.DATA_DIR / "tiles")
     ap.add_argument("--tile", type=int, default=aoi.TILE_PX)
     ap.add_argument("--layer", default="bathy", help="manifest layer name")
@@ -53,7 +57,8 @@ def main() -> None:
     import rasterio
 
     if not args.inp.exists():
-        raise SystemExit(f"Input raster not found: {args.inp}. Run fetch_bathy.py first.")
+        raise SystemExit(f"Input raster not found: {args.inp}. Run fetch_bathy.py "
+                         "(single source) or build_bathy.py (tiered) first.")
 
     with rasterio.open(args.inp) as src:
         depth = src.read(1).astype("float32")
@@ -61,6 +66,19 @@ def main() -> None:
         crs = src.crs
         src_nodata = src.nodata if src.nodata is not None else -9999.0
         H, W = src.height, src.width
+
+    # Optional provenance raster (0 none / 1 NONNA-10 / 2 NONNA-100), same grid.
+    # Legend mirrors build_bathy.py's SRC_* codes.
+    SOURCE_LEGEND = {0: "none", 1: "NONNA-10", 2: "NONNA-100"}
+    SOURCE_CONF = {1: "high", 2: "low"}
+    source = None
+    if args.source_in.exists():
+        with rasterio.open(args.source_in) as s:
+            if s.width == W and s.height == H:
+                source = s.read(1).astype(np.uint8)
+            else:
+                print(f"[tiles] warning: {args.source_in.name} shape "
+                      f"{s.width}x{s.height} != {W}x{H}; ignoring provenance")
 
     res_x = transform.a
     res_y = -transform.e            # positive metres/pixel
@@ -89,15 +107,12 @@ def main() -> None:
 
             tid = f"{args.layer}_{c}_{r}"
             bin_path = args.out_dir / f"{tid}.bin.gz"
-            mask_path = args.out_dir / f"{tid}.mask.gz"
             # little-endian Int16, row-major; tobytes() is C-order (row-major).
             with gzip.open(bin_path, "wb", compresslevel=9) as f:
                 f.write(sub.astype("<i2").tobytes())
-            with gzip.open(mask_path, "wb", compresslevel=9) as f:
-                f.write(sub_mask.tobytes())
-            total_bytes += bin_path.stat().st_size + mask_path.stat().st_size
+            total_bytes += bin_path.stat().st_size
 
-            tiles_meta.append({
+            meta = {
                 "id": tid, "col": c, "row": r,
                 "w": int(x1 - x0), "h": int(y1 - y0),
                 # UTM top-left corner of this tile:
@@ -105,8 +120,28 @@ def main() -> None:
                 "y": round(origin_y - y0 * res_y, 3),
                 "surveyed": surveyed,
                 "coverage": round(surveyed / sub.size, 4),
-                "bin": bin_path.name, "mask": mask_path.name,
-            })
+                "bin": bin_path.name,
+            }
+
+            if source is not None:
+                # Provenance byte per cell — supersedes the coverage mask
+                # (mask == source > 0). Lets the app shade low-confidence fill.
+                sub_src = source[y0:y1, x0:x1]
+                src_path = args.out_dir / f"{tid}.src.gz"
+                with gzip.open(src_path, "wb", compresslevel=9) as f:
+                    f.write(sub_src.tobytes())
+                total_bytes += src_path.stat().st_size
+                meta["src"] = src_path.name
+                meta["srcCounts"] = {str(int(k)): int((sub_src == k).sum())
+                                     for k in np.unique(sub_src) if k != 0}
+            else:
+                mask_path = args.out_dir / f"{tid}.mask.gz"
+                with gzip.open(mask_path, "wb", compresslevel=9) as f:
+                    f.write(sub_mask.tobytes())
+                total_bytes += mask_path.stat().st_size
+                meta["mask"] = mask_path.name
+
+            tiles_meta.append(meta)
 
     manifest = {
         "layer": args.layer,
@@ -131,6 +166,13 @@ def main() -> None:
         },
         "tiles": tiles_meta,
     }
+    if source is not None:
+        manifest["source"] = {
+            "dtype": "uint8", "nodata": 0,
+            "legend": {str(k): v for k, v in SOURCE_LEGEND.items()},
+            "confidence": {str(k): v for k, v in SOURCE_CONF.items()},
+            "scoreTiers": [1],   # only NONNA-10 is structure-grade
+        }
     (args.out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
     surveyed_cells = int(mask.sum())
@@ -138,6 +180,14 @@ def main() -> None:
           f"{total_bytes/1e6:.1f} MB gzipped")
     print(f"[tiles] coverage {100*surveyed_cells/(H*W):.1f}% of AOI "
           f"({surveyed_cells:,}/{H*W:,} cells surveyed)")
+    if source is not None:
+        for k, name in SOURCE_LEGEND.items():
+            if k == 0:
+                continue
+            n = int((source == k).sum())
+            if n:
+                print(f"[tiles]   {name:10s} {100*n/(H*W):5.1f}% "
+                      f"({SOURCE_CONF.get(k,'?')} conf)")
     print(f"[tiles] manifest -> {args.out_dir/'manifest.json'}")
 
 

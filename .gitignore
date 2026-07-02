@@ -20,8 +20,10 @@ data/derived/
 # Keep the manifest and coverage masks metadata, drop the heavy binaries.
 data/tiles/**/*.bin.gz
 data/tiles/**/*.mask.gz
+data/tiles/**/*.src.gz
 data/tiles/*.bin.gz
 data/tiles/*.mask.gz
+data/tiles/*.src.gz
 
 # --- OS / editor cruft ---
 .DS_Store
