@@ -15,12 +15,15 @@
   .notice { color: #ffcf6b; font-weight: 600; }
   #wrap { padding: 12px; }
   canvas { background: #06101a; border: 1px solid #1d3346; max-width: 100%;
-           image-rendering: pixelated; touch-action: none; }
+           image-rendering: pixelated; touch-action: none; cursor: crosshair; }
   #legend { display: flex; gap: 10px; align-items: center; margin-top: 10px;
             flex-wrap: wrap; }
   #ramp { width: 220px; height: 12px; border: 1px solid #1d3346; }
   .swatch { display: inline-block; width: 12px; height: 12px; vertical-align: middle;
             margin-right: 4px; border: 1px solid #1d3346; }
+  #readout { margin-top: 8px; font-variant-numeric: tabular-nums; color: #bfe0ff;
+             min-height: 1.3em; }
+  #readout b { color: #fff; }
 </style>
 </head>
 <body>
@@ -39,18 +42,20 @@
       style="background:repeating-linear-gradient(45deg,#334,#334 2px,#0b1622 2px,#0b1622 4px)"></span>no modern survey</span>
     <span id="range" style="margin-left:16px"></span>
   </div>
+  <div id="readout">move the cursor over the chart to read position + depth</div>
 </div>
 <script type="module">
 // Throwaway M1 sanity viewer: loads the tile manifest + gzipped Int16 depth tiles,
 // decompresses in-browser (DecompressionStream), and renders a depth-tinted mosaic.
-// This is NOT the app renderer (that's M2, ported from the prototype) — just proof
-// that the pipeline output is real and correctly georeferenced.
+// Hovering reads back lat/lon + depth so we can check specific fishing spots against
+// the raw survey. This is NOT the app renderer (that's M2, ported from the prototype).
 //
 // Serve from the repo root so the relative data path resolves:
 //     python3 -m http.server 8000
 //     open http://localhost:8000/pipeline/viewer/
 const MANIFEST_URL = new URL('../../data/tiles/manifest.json', location.href);
 const status = document.getElementById('status');
+const readout = document.getElementById('readout');
 
 // --- depth colormap (metres -> rgb) ---------------------------------------
 const STOPS = [
@@ -74,6 +79,37 @@ function depthColor(m) {
   return STOPS[STOPS.length - 1][1];
 }
 
+// --- inverse UTM (WGS84) -> lon/lat, so the readout shows real coordinates --
+// Standard Snyder inverse transverse Mercator. zoneEpsg 326xx -> zone = xx.
+function utmToLonLat(E, N, epsg) {
+  const zone = epsg - 32600;               // 32609 -> 9 (northern hemisphere)
+  const a = 6378137.0, f = 1 / 298.257223563;
+  const e2 = f * (2 - f), k0 = 0.9996;
+  const lon0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
+  const x = E - 500000, y = N;
+  const M = y / k0;
+  const mu = M / (a * (1 - e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const phi1 = mu
+    + (3*e1/2 - 27*e1**3/32) * Math.sin(2*mu)
+    + (21*e1**2/16 - 55*e1**4/32) * Math.sin(4*mu)
+    + (151*e1**3/96) * Math.sin(6*mu)
+    + (1097*e1**4/512) * Math.sin(8*mu);
+  const ep2 = e2 / (1 - e2);
+  const C1 = ep2 * Math.cos(phi1)**2;
+  const T1 = Math.tan(phi1)**2;
+  const s = Math.sin(phi1);
+  const N1 = a / Math.sqrt(1 - e2*s*s);
+  const R1 = a * (1 - e2) / Math.pow(1 - e2*s*s, 1.5);
+  const D = x / (N1 * k0);
+  const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (D*D/2
+    - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*ep2) * D**4/24
+    + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*ep2 - 3*C1*C1) * D**6/720);
+  const lon = lon0 + (D - (1 + 2*T1 + C1) * D**3/6
+    + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*ep2 + 24*T1*T1) * D**5/120) / Math.cos(phi1);
+  return [lon * 180 / Math.PI, lat * 180 / Math.PI];
+}
+
 async function gunzip(buf) {
   const ds = new DecompressionStream('gzip');
   const stream = new Response(buf).body.pipeThrough(ds);
@@ -90,24 +126,25 @@ function drawRamp() {
   }
 }
 
+let MANIFEST, FIT = 1;
+const TILES = new Map();   // id -> { depths:Int16Array, w, h, col, row }
+
 async function main() {
   drawRamp();
-  let manifest;
   try {
-    manifest = await (await fetch(MANIFEST_URL)).json();
+    MANIFEST = await (await fetch(MANIFEST_URL)).json();
   } catch (e) {
     status.textContent = 'no manifest — run fetch_bathy.py then make_tiles.py first';
     return;
   }
-  const { full, tileSize, tiles, depth } = manifest;
+  const { full, tileSize, tiles, depth } = MANIFEST;
   const NODATA = depth.nodata, SCALE = depth.scale;
 
-  // Fit the full mosaic into a reasonable on-screen canvas.
   const canvas = document.getElementById('c');
   const maxW = Math.min(1400, window.innerWidth - 24);
-  const fit = Math.min(1, maxW / full.width);
-  canvas.width = Math.round(full.width * fit);
-  canvas.height = Math.round(full.height * fit);
+  FIT = Math.min(1, maxW / full.width);
+  canvas.width = Math.round(full.width * FIT);
+  canvas.height = Math.round(full.height * FIT);
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
@@ -120,13 +157,13 @@ async function main() {
       const raw = await gunzip(await (await fetch(new URL(t.bin, MANIFEST_URL)))
         .arrayBuffer());
       const depths = new Int16Array(raw.buffer, raw.byteOffset, raw.byteLength / 2);
+      TILES.set(t.id, { depths, w: t.w, h: t.h, col: t.col, row: t.row });
       off.width = t.w; off.height = t.h;
       const img = octx.createImageData(t.w, t.h);
       for (let i = 0; i < depths.length; i++) {
         const dm = depths[i];
         const o = i * 4;
         if (dm === NODATA) {
-          // coverage hatch: transparent so the dark canvas + pattern reads as "gap"
           const px = i % t.w, py = (i / t.w) | 0;
           const hatch = ((px + py) & 3) === 0;
           img.data[o] = hatch ? 51 : 11;
@@ -141,9 +178,8 @@ async function main() {
         }
       }
       octx.putImageData(img, 0, 0);
-      // tile col/row -> pixel offset in the full mosaic, then scaled to fit.
-      const dx = t.col * tileSize * fit, dy = t.row * tileSize * fit;
-      ctx.drawImage(off, dx, dy, t.w * fit, t.h * fit);
+      const dx = t.col * tileSize * FIT, dy = t.row * tileSize * FIT;
+      ctx.drawImage(off, dx, dy, t.w * FIT, t.h * FIT);
     } catch (e) {
       console.warn('tile failed', t.id, e);
     }
@@ -151,9 +187,43 @@ async function main() {
     status.textContent = `rendered ${done}/${tiles.length} tiles`;
   }
   status.textContent = `${tiles.length} tiles · ${full.width}×${full.height} @ `
-    + `${manifest.res[0]} m · ${manifest.crs}`;
+    + `${MANIFEST.res[0]} m · ${MANIFEST.crs}`;
   document.getElementById('range').textContent =
     isFinite(dmin) ? `depth ${dmin.toFixed(1)}–${dmax.toFixed(1)} m` : '';
+
+  canvas.addEventListener('mousemove', ev => hover(ev, canvas));
+  canvas.addEventListener('mouseleave', () => {
+    readout.textContent = 'move the cursor over the chart to read position + depth';
+  });
+}
+
+function hover(ev, canvas) {
+  const { full, tileSize, res, origin, crs, depth } = MANIFEST;
+  const rect = canvas.getBoundingClientRect();
+  // account for the canvas being CSS-scaled by max-width on narrow screens
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const cx = (ev.clientX - rect.left) * sx, cy = (ev.clientY - rect.top) * sy;
+  const fx = Math.floor(cx / FIT), fy = Math.floor(cy / FIT);   // full-raster cell
+  if (fx < 0 || fy < 0 || fx >= full.width || fy >= full.height) return;
+
+  // UTM easting/northing at the cell centre
+  const E = origin[0] + (fx + 0.5) * res[0];
+  const N = origin[1] - (fy + 0.5) * res[1];
+  const epsg = parseInt(String(crs).split(':')[1], 10);
+  const [lon, lat] = utmToLonLat(E, N, epsg);
+
+  // depth from the retained tile array
+  const col = Math.floor(fx / tileSize), row = Math.floor(fy / tileSize);
+  const t = TILES.get(`${MANIFEST.layer}_${col}_${row}`);
+  let dtxt = '<b>no data</b> (land or no modern survey)';
+  if (t) {
+    const lx = fx - col * tileSize, ly = fy - row * tileSize;
+    const dm = t.depths[ly * t.w + lx];
+    if (dm !== depth.nodata) dtxt = `<b>${(dm / depth.scale).toFixed(1)} m</b>`;
+  }
+  readout.innerHTML =
+    `${lat.toFixed(5)}, ${lon.toFixed(5)} &nbsp;·&nbsp; depth ${dtxt}`
+    + ` &nbsp;·&nbsp; <span style="color:#6f8ba3">UTM ${E.toFixed(0)}, ${N.toFixed(0)}</span>`;
 }
 main();
 </script>
