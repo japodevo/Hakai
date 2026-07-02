@@ -34,10 +34,11 @@ data/              generated tiles + manifests (mostly gitignored)
 ## M1 quick start
 
 ```bash
+# from the repo root, after cloning + checking out the branch:
 cd pipeline && ./bootstrap.sh && source .venv/bin/activate
 # put NONNA-10 GeoTIFFs (AOI 51.55–51.85 N, 128.35–127.85 W) in ../data/raw/
-python fetch_bathy.py --source local
-python make_tiles.py
+python3 fetch_bathy.py --source local
+python3 make_tiles.py
 cd .. && python3 -m http.server 8000   # open http://localhost:8000/pipeline/viewer/
 ```
 
