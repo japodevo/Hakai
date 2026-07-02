@@ -1,0 +1,30 @@
+# --- Python pipeline ---
+pipeline/.venv/
+__pycache__/
+*.pyc
+.python-version
+
+# --- Node / Vite app ---
+app/node_modules/
+app/dist/
+app/dev-dist/
+app/.vite/
+node_modules/
+
+# --- Generated data (see CLAUDE.md: commit the manifest, ignore raw + tiles) ---
+# Raw + reprojected/mosaicked rasters — large, regenerable from source.
+data/raw/
+data/derived/
+
+# Generated binary tiles — regenerable by make_tiles.py.
+# Keep the manifest and coverage masks metadata, drop the heavy binaries.
+data/tiles/**/*.bin.gz
+data/tiles/**/*.mask.gz
+data/tiles/*.bin.gz
+data/tiles/*.mask.gz
+
+# --- OS / editor cruft ---
+.DS_Store
+*.swp
+.idea/
+.vscode/

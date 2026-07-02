@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hakai bathy — throwaway M1 viewer</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b1622; color: #cfe3f2;
+         font: 14px/1.4 -apple-system, system-ui, sans-serif; }
+  header { padding: 10px 14px; background: #10202f; border-bottom: 1px solid #1d3346;
+           display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  #status { color: #8fb3cc; }
+  .notice { color: #ffcf6b; font-weight: 600; }
+  #wrap { padding: 12px; }
+  canvas { background: #06101a; border: 1px solid #1d3346; max-width: 100%;
+           image-rendering: pixelated; touch-action: none; }
+  #legend { display: flex; gap: 10px; align-items: center; margin-top: 10px;
+            flex-wrap: wrap; }
+  #ramp { width: 220px; height: 12px; border: 1px solid #1d3346; }
+  .swatch { display: inline-block; width: 12px; height: 12px; vertical-align: middle;
+            margin-right: 4px; border: 1px solid #1d3346; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hakai Structure Finder — bathy tile viewer</h1>
+  <span id="status">loading…</span>
+  <span class="notice">NOT FOR NAVIGATION</span>
+</header>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="legend">
+    <span>shallow</span>
+    <canvas id="ramp" width="220" height="12"></canvas>
+    <span>deep</span>
+    <span style="margin-left:16px"><span class="swatch"
+      style="background:repeating-linear-gradient(45deg,#334,#334 2px,#0b1622 2px,#0b1622 4px)"></span>no modern survey</span>
+    <span id="range" style="margin-left:16px"></span>
+  </div>
+</div>
+<script type="module">
+// Throwaway M1 sanity viewer: loads the tile manifest + gzipped Int16 depth tiles,
+// decompresses in-browser (DecompressionStream), and renders a depth-tinted mosaic.
+// This is NOT the app renderer (that's M2, ported from the prototype) — just proof
+// that the pipeline output is real and correctly georeferenced.
+//
+// Serve from the repo root so the relative data path resolves:
+//     python3 -m http.server 8000
+//     open http://localhost:8000/pipeline/viewer/
+const MANIFEST_URL = new URL('../../data/tiles/manifest.json', location.href);
+const status = document.getElementById('status');
+
+// --- depth colormap (metres -> rgb) ---------------------------------------
+const STOPS = [
+  [0,   [198, 236, 255]],
+  [10,  [120, 200, 240]],
+  [25,  [ 64, 156, 214]],
+  [50,  [ 36, 110, 178]],
+  [100, [ 24,  74, 140]],
+  [200, [ 16,  44,  96]],
+  [400, [  8,  22,  56]],
+];
+function depthColor(m) {
+  if (m <= STOPS[0][0]) return STOPS[0][1];
+  for (let i = 1; i < STOPS.length; i++) {
+    if (m <= STOPS[i][0]) {
+      const [d0, c0] = STOPS[i - 1], [d1, c1] = STOPS[i];
+      const t = (m - d0) / (d1 - d0);
+      return [0, 1, 2].map(k => Math.round(c0[k] + t * (c1[k] - c0[k])));
+    }
+  }
+  return STOPS[STOPS.length - 1][1];
+}
+
+async function gunzip(buf) {
+  const ds = new DecompressionStream('gzip');
+  const stream = new Response(buf).body.pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function drawRamp() {
+  const rc = document.getElementById('ramp'), rx = rc.getContext('2d');
+  for (let x = 0; x < rc.width; x++) {
+    const m = (x / rc.width) * 250;
+    const [r, g, b] = depthColor(m);
+    rx.fillStyle = `rgb(${r},${g},${b})`;
+    rx.fillRect(x, 0, 1, rc.height);
+  }
+}
+
+async function main() {
+  drawRamp();
+  let manifest;
+  try {
+    manifest = await (await fetch(MANIFEST_URL)).json();
+  } catch (e) {
+    status.textContent = 'no manifest — run fetch_bathy.py then make_tiles.py first';
+    return;
+  }
+  const { full, tileSize, tiles, depth } = manifest;
+  const NODATA = depth.nodata, SCALE = depth.scale;
+
+  // Fit the full mosaic into a reasonable on-screen canvas.
+  const canvas = document.getElementById('c');
+  const maxW = Math.min(1400, window.innerWidth - 24);
+  const fit = Math.min(1, maxW / full.width);
+  canvas.width = Math.round(full.width * fit);
+  canvas.height = Math.round(full.height * fit);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d');
+
+  let dmin = Infinity, dmax = -Infinity, done = 0;
+  for (const t of tiles) {
+    try {
+      const raw = await gunzip(await (await fetch(new URL(t.bin, MANIFEST_URL)))
+        .arrayBuffer());
+      const depths = new Int16Array(raw.buffer, raw.byteOffset, raw.byteLength / 2);
+      off.width = t.w; off.height = t.h;
+      const img = octx.createImageData(t.w, t.h);
+      for (let i = 0; i < depths.length; i++) {
+        const dm = depths[i];
+        const o = i * 4;
+        if (dm === NODATA) {
+          // coverage hatch: transparent so the dark canvas + pattern reads as "gap"
+          const px = i % t.w, py = (i / t.w) | 0;
+          const hatch = ((px + py) & 3) === 0;
+          img.data[o] = hatch ? 51 : 11;
+          img.data[o + 1] = hatch ? 51 : 22;
+          img.data[o + 2] = hatch ? 68 : 34;
+          img.data[o + 3] = 255;
+        } else {
+          const m = dm / SCALE;
+          if (m < dmin) dmin = m; if (m > dmax) dmax = m;
+          const [r, g, b] = depthColor(m);
+          img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255;
+        }
+      }
+      octx.putImageData(img, 0, 0);
+      // tile col/row -> pixel offset in the full mosaic, then scaled to fit.
+      const dx = t.col * tileSize * fit, dy = t.row * tileSize * fit;
+      ctx.drawImage(off, dx, dy, t.w * fit, t.h * fit);
+    } catch (e) {
+      console.warn('tile failed', t.id, e);
+    }
+    done++;
+    status.textContent = `rendered ${done}/${tiles.length} tiles`;
+  }
+  status.textContent = `${tiles.length} tiles · ${full.width}×${full.height} @ `
+    + `${manifest.res[0]} m · ${manifest.crs}`;
+  document.getElementById('range').textContent =
+    isFinite(dmin) ? `depth ${dmin.toFixed(1)}–${dmax.toFixed(1)} m` : '';
+}
+main();
+</script>
+</body>
+</html>

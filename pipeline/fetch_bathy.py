@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""fetch_bathy.py — build the AOI bathymetry raster for Hakai Structure Finder.
+
+Two input paths (pick with --source):
+
+  --source local  (default, most reliable)
+      Drop portal-downloaded GeoTIFFs into data/raw/ (from https://data.chs-shc.ca,
+      NONNA-10, GeoTIFF export). This script mosaics them, reprojects to UTM 9N, and
+      resamples to the target resolution. This is the path that always works — the
+      portal export needs a free account but no scripting.
+
+  --source wcs   (best-effort, no account, no manual download)
+      Programmatic GetCoverage against the NONNA GeoServer, subtiled on the native
+      0.1° grid across the AOI. The exact coverageId and subset axis labels vary by
+      GeoServer config, so discover them first:
+
+          python fetch_bathy.py --list-coverages
+          python fetch_bathy.py --describe <coverageId>
+
+      then re-run with --coverage-id / --axis-lon / --axis-lat as needed.
+
+Output: a single-band Float32 GeoTIFF in UTM 9N, depths in metres (positive down to
+chart datum, matching NONNA), nodata = -9999. Feed it to make_tiles.py.
+
+Requires: rasterio, numpy, requests  (see requirements.txt)
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import hakai_aoi as aoi
+
+OUT_NODATA = -9999.0
+
+
+# --------------------------------------------------------------------------- #
+# WCS discovery + fetch (best-effort)                                         #
+# --------------------------------------------------------------------------- #
+def _get(url: str, params: dict, timeout: int = 120):
+    import requests
+    r = requests.get(url, params=params, timeout=timeout)
+    r.raise_for_status()
+    return r
+
+
+def list_coverages(wcs_url: str) -> list[str]:
+    """Print + return coverage ids advertised by GetCapabilities."""
+    r = _get(wcs_url, {"service": "WCS", "version": "2.0.1",
+                       "request": "GetCapabilities"})
+    root = ET.fromstring(r.content)
+    ids: list[str] = []
+    # CoverageId lives under wcs:Contents/wcs:CoverageSummary/wcs:CoverageId,
+    # namespace-agnostic match so we don't hard-code the GeoServer NS URIs.
+    for el in root.iter():
+        if el.tag.rsplit("}", 1)[-1] == "CoverageId" and el.text:
+            ids.append(el.text.strip())
+    return ids
+
+
+def describe_coverage(wcs_url: str, coverage_id: str) -> str:
+    r = _get(wcs_url, {"service": "WCS", "version": "2.0.1",
+                       "request": "DescribeCoverage", "coverageId": coverage_id})
+    return r.text
+
+
+def fetch_wcs_subtiles(wcs_url: str, coverage_id: str, raw_dir: Path,
+                       axis_lon: str, axis_lat: str) -> list[Path]:
+    """GetCoverage each 0.1° subtile of the AOI as a GeoTIFF into raw_dir."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    tiles = aoi.subtile_bboxes(aoi.aoi_bbox())
+    print(f"[wcs] {len(tiles)} subtiles for AOI {aoi.aoi_bbox()}")
+    for i, b in enumerate(tiles):
+        out = raw_dir / f"nonna10_{b.lat_min:.1f}N_{abs(b.lon_min):.1f}W.tif"
+        if out.exists() and out.stat().st_size > 0:
+            written.append(out)
+            continue
+        params = {
+            "service": "WCS", "version": "2.0.1", "request": "GetCoverage",
+            "coverageId": coverage_id, "format": "image/geotiff",
+            # WCS 2.0.1 subset syntax; axis labels come from DescribeCoverage.
+            "subset": [f"{axis_lat}({b.lat_min},{b.lat_max})",
+                       f"{axis_lon}({b.lon_min},{b.lon_max})"],
+        }
+        try:
+            r = _get(wcs_url, params)
+            ctype = r.headers.get("content-type", "")
+            if "xml" in ctype.lower():
+                # GeoServer returns an ExceptionReport as XML on error.
+                print(f"[wcs] subtile {i} error:\n{r.text[:600]}", file=sys.stderr)
+                continue
+            out.write_bytes(r.content)
+            written.append(out)
+            print(f"[wcs] {out.name} ({len(r.content)//1024} KB)")
+        except Exception as e:  # noqa: BLE001 — keep going, report at the end
+            print(f"[wcs] subtile {i} failed: {e}", file=sys.stderr)
+    return written
+
+
+# --------------------------------------------------------------------------- #
+# Mosaic + reproject + resample                                               #
+# --------------------------------------------------------------------------- #
+def build_raster(rasters: list[Path], out_path: Path, res_m: float) -> None:
+    import numpy as np
+    import rasterio
+    from rasterio.merge import merge
+    from rasterio.warp import calculate_default_transform, reproject, Resampling
+
+    if not rasters:
+        raise SystemExit(
+            "No input rasters. Put NONNA-10 GeoTIFFs in data/raw/ (--source local) "
+            "or fetch via --source wcs. Nothing to mosaic.")
+
+    srcs = [rasterio.open(p) for p in rasters]
+    try:
+        # 1) Mosaic in whatever CRS the inputs use (NONNA export is geographic WGS84).
+        mosaic, mosaic_transform = merge(srcs, nodata=srcs[0].nodata)
+        src_crs = srcs[0].crs
+        src_nodata = srcs[0].nodata
+        band = mosaic[0]
+        h, w = band.shape
+    finally:
+        for s in srcs:
+            s.close()
+
+    # 2) Compute the UTM 9N transform at the requested ground resolution.
+    dst_crs = rasterio.crs.CRS.from_epsg(aoi.UTM_9N_EPSG)
+    left = mosaic_transform.c
+    top = mosaic_transform.f
+    right = left + mosaic_transform.a * w
+    bottom = top + mosaic_transform.e * h
+    dst_transform, dst_w, dst_h = calculate_default_transform(
+        src_crs, dst_crs, w, h, left, bottom, right, top, resolution=res_m)
+
+    dst = np.full((dst_h, dst_w), OUT_NODATA, dtype="float32")
+    reproject(
+        source=band.astype("float32"),
+        destination=dst,
+        src_transform=mosaic_transform, src_crs=src_crs,
+        src_nodata=src_nodata,
+        dst_transform=dst_transform, dst_crs=dst_crs,
+        dst_nodata=OUT_NODATA,
+        resampling=Resampling.bilinear,
+    )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    profile = {
+        "driver": "GTiff", "dtype": "float32", "count": 1,
+        "width": dst_w, "height": dst_h,
+        "crs": dst_crs, "transform": dst_transform,
+        "nodata": OUT_NODATA, "compress": "deflate", "predictor": 2,
+        "tiled": True, "blockxsize": 512, "blockysize": 512,
+    }
+    with rasterio.open(out_path, "w", **profile) as d:
+        d.write(dst, 1)
+
+    valid = dst[dst != OUT_NODATA]
+    cov = 100.0 * valid.size / dst.size if dst.size else 0.0
+    print(f"[done] {out_path}  {dst_w}x{dst_h} @ {res_m} m  UTM9N")
+    if valid.size:
+        print(f"[done] depth range {valid.min():.1f}..{valid.max():.1f} m, "
+              f"coverage {cov:.1f}% of AOI (rest = no modern survey)")
+    else:
+        print("[warn] no valid depth cells — check inputs / nodata handling")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--source", choices=["local", "wcs"], default="local")
+    ap.add_argument("--res", type=float, default=aoi.DEFAULT_RES_M,
+                    help="output resolution in metres (10 default, 20 halves size)")
+    ap.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
+    ap.add_argument("--out", type=Path, default=Path("data/derived/bathy_utm9n.tif"))
+    ap.add_argument("--wcs-url", default=aoi.NONNA_WCS_URL)
+    ap.add_argument("--coverage-id", default=None,
+                    help="WCS coverageId (discover via --list-coverages)")
+    ap.add_argument("--axis-lon", default="Long", help="WCS subset axis label for longitude")
+    ap.add_argument("--axis-lat", default="Lat", help="WCS subset axis label for latitude")
+    ap.add_argument("--list-coverages", action="store_true")
+    ap.add_argument("--describe", metavar="COVERAGE_ID", default=None)
+    args = ap.parse_args()
+
+    if args.list_coverages:
+        for cid in list_coverages(args.wcs_url):
+            print(cid)
+        return
+    if args.describe:
+        print(describe_coverage(args.wcs_url, args.describe))
+        return
+
+    if args.source == "wcs":
+        if not args.coverage_id:
+            raise SystemExit("--source wcs needs --coverage-id "
+                             "(run --list-coverages first).")
+        rasters = fetch_wcs_subtiles(args.wcs_url, args.coverage_id, args.raw_dir,
+                                     args.axis_lon, args.axis_lat)
+    else:
+        rasters = sorted(args.raw_dir.glob("*.tif")) + sorted(args.raw_dir.glob("*.tiff"))
+        print(f"[local] {len(rasters)} GeoTIFF(s) in {args.raw_dir}")
+
+    build_raster(rasters, args.out, args.res)
+
+
+if __name__ == "__main__":
+    main()
