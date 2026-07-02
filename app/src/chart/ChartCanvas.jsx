@@ -91,12 +91,13 @@ export default function ChartCanvas() {
       const m = String(man.crs).match(/(\d+)/)
       if (m) epsgRef.current = parseInt(m[1], 10)
       fitView()
-      let done = 0
+      let done = 0, ok = 0
       for (const t of man.tiles) {
         try {
           const tile = await loadTile(man, t)
           if (cancelled) return
           tilesRef.current.set(t.id, { t, ...tile })
+          ok++
         } catch (e) {
           console.warn('tile failed', t.id, e)
         }
@@ -104,7 +105,9 @@ export default function ChartCanvas() {
         setStatus(`loading ${done}/${man.tiles.length} tiles`)
         scheduleDraw()
       }
-      setStatus(null)
+      setStatus(ok === 0
+        ? 'no tiles rendered — tile fetch/decompress failed (see console)'
+        : null)
       requestGps()
     })()
     return () => { cancelled = true }

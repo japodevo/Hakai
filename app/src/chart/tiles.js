@@ -5,8 +5,12 @@ import { depthColor } from './proj.js'
 const BASE = import.meta.env.BASE_URL
 
 async function gunzip(buf) {
-  const ds = new DecompressionStream('gzip')
-  const stream = new Response(buf).body.pipeThrough(ds)
+  const u8 = new Uint8Array(buf)
+  // If the server already inflated the .gz (e.g. Vite/sirv sets Content-Encoding:
+  // gzip and the browser decompresses transparently), the bytes won't start with
+  // the gzip magic number — use them as-is. Otherwise decompress ourselves.
+  if (u8.length < 2 || u8[0] !== 0x1f || u8[1] !== 0x8b) return u8
+  const stream = new Response(u8).body.pipeThrough(new DecompressionStream('gzip'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
