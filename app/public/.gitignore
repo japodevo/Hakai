@@ -1,5 +1,0 @@
-# Deploy artifact — intentionally empty (no ignore rules).
-# This file is copied into dist/ by Vite and published to the gh-pages branch,
-# where it overrides the repo's root .gitignore so the *.bin.gz / *.src.gz bathy
-# tiles actually get published (otherwise `gh-pages` git-add skips them and the
-# chart renders blank). The source repo still ignores generated tiles elsewhere.
