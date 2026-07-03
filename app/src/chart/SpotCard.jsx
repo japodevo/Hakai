@@ -1,6 +1,7 @@
 import { fmtDepth } from './proj.js'
 import { rationale, tideHint, explain, liveScore, currentPlay } from '../scoring/score.js'
 import { nextWindow, fmtTime, tideFitAt, SLACK_LAG_MIN } from '../tides/tides.js'
+import { lightBand } from '../tides/sun.js'
 
 function Bar({ label, v }) {
   return (
@@ -32,6 +33,7 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
   const livePct = Math.min(99, Math.round(liveScore(spot.score, species, tide, nowMs) * 100))
   const fit = tide ? tideFitAt(tide, species, nowMs) : 1
   const fitWord = !tide ? null : fit >= 0.66 ? 'prime tide' : fit >= 0.33 ? 'fair tide' : 'slack / off-tide'
+  const lightWord = { night: 'dark', lowLight: '☀ prime light', day: 'daylight' }[lightBand(nowMs)]
   const nw = tide ? nextWindow(tide, species, nowMs) : null
   const whenValue = nw
     ? `${nw.label.split(' — ')[0]} · ${fmtTime(nw.start)}–${fmtTime(nw.end)}${nw.current ? ' (now)' : ''}`
@@ -85,16 +87,17 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
 
       <div className="spot-score">
         <b>{livePct}</b><span>/100 bite score now</span>
-        {fitWord ? <em>· {fitWord}</em> : null}
+        {fitWord ? <em>· {fitWord} · {lightWord}</em> : null}
       </div>
       <div className="spot-score-sub">
-        Structure {structPct}/100{tide ? ' × the tide right now' : ''} · {Math.round(spot.rel * 100)}% of best in view.
+        Structure {structPct}/100{tide ? ' × tide × light at this time' : ''}
+        {!inSeason ? ' × off-season' : ''} · {Math.round(spot.rel * 100)}% of best in view.
         {tide ? ' Scrub the 🌊 time slider to see it change through the day.' : ''}
       </div>
 
       <div className="spot-note">
         ⚠ Not for navigation. Structure score compares zone-to-zone (same species); bite
-        score also folds in the tide at the selected time.
+        score also folds in the tide, light, and season at the selected time.
         {species.regsNote ? ` Regs: ${species.regsNote.slice(0, 160)}…` : ' Verify current DFO regs before you fish.'}
       </div>
     </div>
