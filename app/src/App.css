@@ -1,4 +1,5 @@
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -23,15 +24,22 @@
   white-space: nowrap;
 }
 
+/* compact, dismissible — not a full-width alarm bar */
 .app-toast {
   position: absolute;
-  left: 12px; right: 12px;
-  bottom: calc(90px + var(--safe-bottom));
+  right: 12px;
+  top: calc(60px + var(--safe-top));
+  max-width: 300px;
+  display: flex; align-items: center; gap: 10px;
   background: rgba(60, 30, 20, 0.94);
   color: var(--warn);
   border: 1px solid #5a3a24;
-  border-radius: 12px;
-  padding: 10px 14px;
-  font-size: 13px;
-  text-align: center;
+  border-radius: 10px;
+  padding: 8px 8px 8px 12px;
+  font-size: 12px;
+}
+.app-toast .toast-x {
+  min-width: 28px; min-height: 28px; width: 28px; height: 28px;
+  padding: 0; font-size: 18px; line-height: 1;
+  background: transparent; border: none; color: var(--warn);
 }

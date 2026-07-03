@@ -4,6 +4,7 @@ import './App.css'
 
 export default function App() {
   const [persisted, setPersisted] = useState(null)
+  const [showStorageNote, setShowStorageNote] = useState(true)
 
   // Ask the browser to keep our offline data from being evicted (M6 hardens this).
   useEffect(() => {
@@ -24,9 +25,11 @@ export default function App() {
 
       <ChartCanvas />
 
-      {persisted === false && (
+      {persisted === false && showStorageNote && (
         <div className="app-toast">
-          Storage not persisted — offline data may be evicted. (Add to Home Screen helps.)
+          <span>Storage not persisted — add to Home Screen to keep offline data.</span>
+          <button className="toast-x" onClick={() => setShowStorageNote(false)}
+            aria-label="Dismiss">×</button>
         </div>
       )}
     </div>

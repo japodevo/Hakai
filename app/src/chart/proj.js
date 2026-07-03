@@ -51,6 +51,13 @@ export function utmToLonLat(E, N, epsg) {
   return [lonR * R2D, lat * R2D]
 }
 
+// Format a depth (metres, positive-down) in the chosen units. BC salmon anglers
+// set downriggers in feet, so 'ft' is a first-class option.
+export function fmtDepth(m, units) {
+  if (units === 'ft') return `${Math.round(m * 3.28084)} ft`
+  return `${m.toFixed(1)} m`
+}
+
 // Depth (metres) -> [r,g,b]. Shallow = light, deep = dark blue.
 const STOPS = [
   [0, [198, 236, 255]], [10, [120, 200, 240]], [25, [64, 156, 214]],

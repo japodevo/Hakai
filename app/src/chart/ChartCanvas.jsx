@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadManifest, loadTile } from './tiles.js'
-import { lonLatToUtm, utmToLonLat } from './proj.js'
+import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import './chart.css'
 
@@ -20,10 +20,21 @@ export default function ChartCanvas() {
 
   const { pos, error: gpsError, request: requestGps } = useGeolocation()
   const posRef = useRef(null)
+  const unitsRef = useRef('m')
   const [status, setStatus] = useState('loading chart…')
   const [readout, setReadout] = useState(null)
+  const [units, setUnits] = useState('m')
+  const [legendOpen, setLegendOpen] = useState(true)
+  const [gpsState, setGpsState] = useState('off')  // off | acquiring | active
 
-  useEffect(() => { posRef.current = pos; scheduleDraw() }, [pos])
+  useEffect(() => {
+    posRef.current = pos
+    if (pos) setGpsState('active')
+    scheduleDraw()
+  }, [pos])
+  useEffect(() => { unitsRef.current = units }, [units])
+
+  function startGps() { setGpsState('acquiring'); requestGps() }
 
   // ---- draw loop -----------------------------------------------------------
   function scheduleDraw() {
@@ -73,6 +84,27 @@ export default function ChartCanvas() {
       ctx.fillStyle = '#8fd0ff'; ctx.fill()
       ctx.lineWidth = 3; ctx.strokeStyle = '#06101a'; ctx.stroke()
     }
+
+    // Scale bar (metric, live with zoom), bottom-left.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    const mPerPx = man.res[0] / scale
+    const target = 90 * mPerPx
+    const p10 = Math.pow(10, Math.floor(Math.log10(target)))
+    let nice = p10
+    for (const s of [1, 2, 5, 10]) if (s * p10 <= target) nice = s * p10
+    const barPx = nice / mPerPx
+    const bx = 16, by = ch - 74
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)'
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(bx, by - 6); ctx.lineTo(bx, by)
+    ctx.lineTo(bx + barPx, by); ctx.lineTo(bx + barPx, by - 6)
+    ctx.stroke()
+    ctx.font = '600 12px -apple-system, system-ui, sans-serif'
+    ctx.fillText(nice >= 1000 ? `${nice / 1000} km` : `${nice} m`, bx, by - 9)
+    ctx.shadowBlur = 0
   }
 
   // ---- load ----------------------------------------------------------------
@@ -108,7 +140,7 @@ export default function ChartCanvas() {
       setStatus(ok === 0
         ? 'no tiles rendered — tile fetch/decompress failed (see console)'
         : null)
-      requestGps()
+      startGps()
     })()
     return () => { cancelled = true }
   }, [])
@@ -197,6 +229,14 @@ export default function ChartCanvas() {
     const { x, y } = localXY(e)
     zoomAbout(x, y, Math.exp(-e.deltaY * 0.0015))
   }
+  function onDoubleClick(e) {
+    const { x, y } = localXY(e)
+    zoomAbout(x, y, 1.8)
+  }
+  function zoomCenter(factor) {
+    const wrap = wrapRef.current
+    if (wrap) zoomAbout(wrap.clientWidth / 2, wrap.clientHeight / 2, factor)
+  }
 
   // ---- tap readout ---------------------------------------------------------
   function probe(sx, sy) {
@@ -234,7 +274,7 @@ export default function ChartCanvas() {
   function recenter() {
     const p = posRef.current, man = manifestRef.current, wrap = wrapRef.current
     if (!man || !wrap) return
-    if (!p) { requestGps(); return }
+    if (!p) { startGps(); return }
     const [E, N] = lonLatToUtm(p.lon, p.lat, epsgRef.current)
     const fx = (E - man.origin[0]) / man.res[0]
     const fy = (man.origin[1] - N) / man.res[1]
@@ -254,11 +294,33 @@ export default function ChartCanvas() {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onWheel={onWheel}
+        onDoubleClick={onDoubleClick}
       />
       {status && <div className="chart-status">{status}</div>}
 
+      <div className={`chart-legend ${legendOpen ? '' : 'collapsed'}`}>
+        <button className="legend-toggle" onClick={() => setLegendOpen((o) => !o)}>
+          Depth {legendOpen ? '▾' : '▸'}
+        </button>
+        {legendOpen && (
+          <div className="legend-body">
+            <div className="ramp" />
+            <div className="ramp-labels">
+              <span>0</span><span>{fmtDepth(50, units)}</span><span>{fmtDepth(200, units)}+</span>
+            </div>
+            <div className="legend-key"><span className="sw hatch" />no survey</div>
+            <div className="legend-key"><span className="sw fill" />coarse fill (low conf)</div>
+          </div>
+        )}
+      </div>
+
       <div className="chart-controls">
-        <button className="primary" onClick={recenter} title="Center on GPS">◎</button>
+        <button onClick={() => setUnits((u) => (u === 'm' ? 'ft' : 'm'))}
+          title="Depth units">{units}</button>
+        <button onClick={() => zoomCenter(1.6)} title="Zoom in">+</button>
+        <button onClick={() => zoomCenter(1 / 1.6)} title="Zoom out">−</button>
+        <button className={`primary gps-${gpsState}`} onClick={recenter}
+          title="Center on GPS">◎</button>
         <button onClick={fitView} title="Fit whole area">⤢</button>
       </div>
 
@@ -266,7 +328,7 @@ export default function ChartCanvas() {
         <div className="chart-readout">
           <span className="mono">{readout.lat.toFixed(5)}, {readout.lon.toFixed(5)}</span>
           <span>{readout.depth != null
-            ? <>depth <b>{readout.depth.toFixed(1)} m</b></>
+            ? <>depth <b>{fmtDepth(readout.depth, units)}</b></>
             : <span className="muted">no survey here</span>}</span>
           {readout.source && (
             <span className={readout.source.conf === 'low' ? 'warn' : 'ok'}>

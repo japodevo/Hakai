@@ -20,9 +20,43 @@
   position: absolute;
   right: 14px;
   bottom: calc(20px + var(--safe-bottom));
-  display: flex; flex-direction: column; gap: 12px;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.chart-controls button { width: 56px; height: 56px; font-size: 22px; padding: 0; }
+.chart-controls button { width: 52px; height: 52px; font-size: 20px; padding: 0; }
+.chart-controls button.gps-acquiring { border-color: var(--warn); animation: gpspulse 1.1s ease-in-out infinite; }
+.chart-controls button.gps-active { background: #1b6b4c; border-color: #3fbf88; color: #eafff5; }
+@keyframes gpspulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,207,107,0.5); } 50% { box-shadow: 0 0 0 6px rgba(255,207,107,0); } }
+
+/* --- depth legend (collapsible, top-left) --- */
+.chart-legend {
+  position: absolute;
+  top: 12px; left: 12px;
+  background: rgba(16, 32, 47, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 44px;
+}
+.chart-legend .legend-toggle {
+  background: transparent; border: none; border-radius: 0;
+  width: 100%; min-height: 40px; height: 40px;
+  font-size: 13px; font-weight: 600; text-align: left; padding: 0 12px;
+}
+.legend-body { padding: 0 12px 12px; width: 176px; }
+.legend-body .ramp {
+  height: 12px; border-radius: 3px; border: 1px solid var(--line);
+  background: linear-gradient(to right,
+    rgb(198,236,255) 0%, rgb(120,200,240) 8%, rgb(64,156,214) 18%,
+    rgb(36,110,178) 32%, rgb(24,74,140) 55%, rgb(16,44,96) 85%, rgb(8,22,56) 100%);
+}
+.legend-body .ramp-labels {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted); margin: 3px 0 8px;
+}
+.legend-key { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend-key .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); flex: 0 0 auto; }
+.legend-key .sw.hatch { background: repeating-linear-gradient(45deg,#334,#334 2px,#0b1622 2px,#0b1622 4px); }
+.legend-key .sw.fill { background: #5f7a90; }
 
 .chart-readout {
   position: absolute;
