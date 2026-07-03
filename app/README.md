@@ -27,6 +27,30 @@ npm run build && npm run preview
 # open the preview URL, then toggle airplane mode / DevTools "Offline" — it still loads
 ```
 
+## Deploy for offline use on the phone (GitHub Pages)
+
+iOS only installs a PWA / caches for offline from an **HTTPS** origin — the Mac's
+`http://192.168.x.x` LAN URL won't do it. GitHub Pages gives free HTTPS. The bathy
+tiles are generated locally, so build+deploy from the Mac (CI has no tiles):
+
+```bash
+cd app
+npm install           # first time (adds gh-pages)
+npm run deploy        # builds (bundles tiles) + pushes dist/ to the gh-pages branch
+```
+
+One-time repo setup: **GitHub → repo Settings → Pages → Source: "Deploy from a
+branch" → Branch: `gh-pages` / `/ (root)`**. After ~1 min the app is live at:
+
+```
+https://japodevo.github.io/Hakai/
+```
+
+On the iPhone: open that URL in **Safari → Share → Add to Home Screen**. The service
+worker precaches the shell + all tiles; then toggle airplane mode to confirm it opens
+offline. (`base: './'` keeps asset paths working under the `/Hakai/` subpath; if the
+offline install misbehaves on iOS, switch to a root-domain host like Cloudflare Pages.)
+
 ## What's here (M2)
 
 - `src/chart/ChartCanvas.jsx` — canvas renderer: pre-renders each tile, pans/zooms via
