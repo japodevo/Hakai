@@ -87,6 +87,15 @@ python3 fetch_tides.py --from 2026-07-10 --to 2026-07-18   # -> ../data/tides.js
 Resolves the nearest IWLS station to Pruth Bay, pulls 15-min predictions (`wlp`) +
 high/low events (`wlp-hilo`) for the range ± 3 buffer days.
 
+## Base map — coastline + place labels (optional)
+
+```bash
+python3 fetch_coastline.py     # -> ../data/coastline.json + ../data/places.json
+```
+Pulls OSM `natural=coastline` ways + named place/natural nodes for the AOI (Overpass
+API). The app draws the shoreline outline + labels if these files are present, so land
+is distinguishable from "no modern survey" water. Re-run + redeploy to refresh.
+
 ## Notes
 
 - Depths are to **chart datum** and **not for navigation** (CHS NONNA license).

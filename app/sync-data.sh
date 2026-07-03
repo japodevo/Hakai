@@ -23,3 +23,7 @@ if [ -f "$SRC/tides.json" ]; then
   cp "$SRC/tides.json" "$DST/tides.json"
   echo "[sync-data] tides.json synced"
 fi
+
+for f in coastline.json places.json; do
+  [ -f "$SRC/$f" ] && cp "$SRC/$f" "$DST/$f" && echo "[sync-data] $f synced"
+done

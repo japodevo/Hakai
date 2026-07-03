@@ -70,8 +70,17 @@ export default function ChartCanvas() {
   useEffect(() => { zoneRef.current = zoneSpots; scheduleDraw() }, [zoneSpots])
   const catchesRef = useRef([])
   const tideRef = useRef(null)
+  const coastRef = useRef(null)      // optional OSM shoreline polylines
+  const placesRef = useRef(null)     // optional named place labels
 
   useEffect(() => { loadTides().then(setTide) }, [])
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    fetch(`${base}data/coastline.json`).then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.lines) { coastRef.current = j.lines; scheduleDraw() } }).catch(() => {})
+    fetch(`${base}data/places.json`).then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.places) { placesRef.current = j.places; scheduleDraw() } }).catch(() => {})
+  }, [])
   useEffect(() => { tideRef.current = tide }, [tide])
   useEffect(() => { allCatches().then(setCatches).catch(() => {}) }, [])
   useEffect(() => { catchesRef.current = catches; scheduleDraw() }, [catches])
@@ -279,6 +288,25 @@ export default function ChartCanvas() {
     }
     ctx.imageSmoothingEnabled = true
 
+    // optional OSM shoreline (screen space)
+    const coast = coastRef.current
+    if (coast) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.strokeStyle = 'rgba(232,226,198,0.75)'
+      ctx.lineWidth = 1.3
+      const ox = man.origin[0], oy = man.origin[1], rx = man.res[0], ry = man.res[1]
+      for (const line of coast) {
+        ctx.beginPath()
+        for (let i = 0; i < line.length; i++) {
+          const [E, N] = lonLatToUtm(line[i][0], line[i][1], epsgRef.current)
+          const px = ((E - ox) / rx) * scale + tx
+          const py = ((oy - N) / ry) * scale + ty
+          if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py)
+        }
+        ctx.stroke()
+      }
+    }
+
     // GPS own-ship marker (screen space)
     const p = posRef.current
     if (p) {
@@ -362,6 +390,28 @@ export default function ChartCanvas() {
         ctx.fillStyle = '#ffcf6b'; ctx.fill()
         ctx.lineWidth = 1.5; ctx.strokeStyle = '#06101a'; ctx.stroke()
       }
+    }
+
+    // place-name labels (on top, screen space)
+    const places = placesRef.current
+    if (places) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.font = '600 12px -apple-system, system-ui, sans-serif'
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3
+      const ox = man.origin[0], oy = man.origin[1], rx = man.res[0], ry = man.res[1]
+      for (const p of places) {
+        const [E, N] = lonLatToUtm(p.lon, p.lat, epsgRef.current)
+        const px = ((E - ox) / rx) * scale + tx
+        const py = ((oy - N) / ry) * scale + ty
+        if (px < 0 || py < 0 || px > cw || py > ch) continue
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'
+        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = 'rgba(235,244,252,0.92)'
+        ctx.fillText(p.name, px + 6, py)
+      }
+      ctx.shadowBlur = 0
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
     }
   }
 
