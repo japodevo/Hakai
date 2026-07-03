@@ -5,8 +5,10 @@
 // Depth convention: positive-down metres. A "high spot" (pinnacle/hump) is SHALLOWER
 // (smaller depth) than its surroundings, so prominence = boxMeanDepth - cellDepth.
 
-const PROM_CAP = 18      // m of relief that maps to prominence = 1
-const SLOPE_CAP = 0.7    // rise/run (~35°) that maps to slope = 1
+// Caps set high so only exceptional structure hits 1.0 — this spreads the scores
+// out (otherwise most decent structure saturates and everything scores the same).
+const PROM_CAP = 35      // m of relief that maps to prominence = 1
+const SLOPE_CAP = 1.0    // rise/run (~45°) that maps to slope = 1
 const PROM_RADIUS_M = 150
 const ADJ_RADIUS_M = 60
 

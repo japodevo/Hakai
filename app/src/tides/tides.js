@@ -69,6 +69,22 @@ export function speciesWindows(tide, species) {
   return out.sort((x, y) => x.start - y.start)
 }
 
+// How well time `now` suits fishing this species, 0..1, from the tide alone.
+// Peaks at the centre of a good window and tapers to its edges; 0 when the tide
+// is doing nothing useful. Drives the live pin brightness as you scrub the slider.
+export function tideFitAt(tide, species, now) {
+  const ws = speciesWindows(tide, species)
+  if (!ws.length) return 1
+  let best = 0
+  for (const w of ws) {
+    if (now < w.start || now > w.end) continue
+    const half = (w.end - w.start) / 2 || 1
+    const prox = 1 - Math.abs(now - w.center) / half   // 1 at centre → 0 at the edge
+    best = Math.max(best, w.weight * (0.55 + 0.45 * prox))
+  }
+  return Math.max(0, Math.min(1, best))
+}
+
 // The current or next good window for a species at time `now`.
 export function nextWindow(tide, species, now, minW = 0.6) {
   const ws = speciesWindows(tide, species).filter((x) => x.weight >= minW)

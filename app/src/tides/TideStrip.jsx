@@ -62,14 +62,24 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
   }
 
   const nw = species ? nextWindow(tide, species, now) : null
+  const DAY = 86400000
+  const goDay = (dir) => {
+    const t = now + dir * DAY
+    onRefTime(Math.min(Math.max(t, tide.start ?? t), tide.end ?? t))
+  }
+  const atStart = tide.start != null && now - DAY < tide.start
+  const atEnd = tide.end != null && now + DAY > tide.end
 
   return (
     <div className="tide-strip">
       <div className="tide-head">
-        <span className="tide-date">
-          Tide · {new Date(now).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-          {tide.station?.name ? ` · ${tide.station.name}` : ''}
-        </span>
+        <div className="tide-nav">
+          <button onClick={() => goDay(-1)} disabled={atStart} aria-label="Previous day">‹</button>
+          <span className="tide-date">
+            {new Date(now).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
+          <button onClick={() => goDay(1)} disabled={atEnd} aria-label="Next day">›</button>
+        </div>
         {nw && <span className="tide-next" style={{ color: species.color }}>
           {nw.current ? 'Now: ' : 'Next: '}{nw.label.split(' — ')[0]} {fmtTime(nw.start)}–{fmtTime(nw.end)}
         </span>}
@@ -78,6 +88,7 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
 
       {body}
 
+      <label className="tide-slider-label">Time of day</label>
       <input className="tide-slider" type="range" min={d0} max={d1} step={900000}
         value={Math.min(Math.max(now, d0), d1)}
         onChange={(e) => onRefTime(Number(e.target.value))} />

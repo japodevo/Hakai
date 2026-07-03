@@ -4,7 +4,7 @@ import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import { SPECIES } from '../scoring/species.js'
 import { computeSpots, buildHeat } from '../scoring/score.js'
-import { loadTides, phaseNow, referenceNow } from '../tides/tides.js'
+import { loadTides, phaseNow, referenceNow, tideFitAt } from '../tides/tides.js'
 import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
 import { allCatches, putCatch, deleteCatch, newId } from '../catch/db.js'
@@ -70,6 +70,7 @@ export default function ChartCanvas() {
   useEffect(() => { zoneRef.current = zoneSpots; scheduleDraw() }, [zoneSpots])
   const catchesRef = useRef([])
   const tideRef = useRef(null)
+  const effTimeRef = useRef(Date.now())   // effective "now" from the time slider, for pin tide-fit
   const coastRef = useRef(null)      // optional OSM shoreline polylines
   const placesRef = useRef(null)     // optional named place labels
 
@@ -354,24 +355,33 @@ export default function ChartCanvas() {
     visRef.current = shown
     if (sp && shown.length) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.font = '700 12px -apple-system, system-ui, sans-serif'
+      ctx.font = '700 11px -apple-system, system-ui, sans-serif'
       const active = activeSpotRef.current
+      // live tide fit for the active species: brightens pins in a good window,
+      // dims them at slack / off-tide, so scrubbing the slider visibly changes them.
+      const t = tideRef.current
+      const fit = t ? tideFitAt(t, sp, effTimeRef.current) : 1
+      const alpha = 0.4 + 0.6 * fit
       for (const s of shown) {
         const px = (s.fx + 0.5) * scale + tx
         const py = (s.fy + 0.5) * scale + ty
         if (px < -24 || py < -24 || px > cw + 24 || py > ch + 24) continue
-        const r = s.rank === 1 ? 13 : 10
+        const r = s.rank === 1 ? 15 : 13   // a touch bigger to fit the 2-digit score
         if (active && active.fx === s.fx && active.fy === s.fy) {
           ctx.beginPath(); ctx.arc(px, py, r + 5, 0, Math.PI * 2)
           ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
         }
+        ctx.globalAlpha = alpha
         ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2)
         ctx.fillStyle = sp.color; ctx.fill()
         // zone pins get a dashed white ring to show they're an ad-hoc rescore
         ctx.lineWidth = 2; ctx.strokeStyle = isZone ? '#fff' : '#06101a'
         if (isZone) ctx.setLineDash([3, 3])
         ctx.stroke(); ctx.setLineDash([])
-        ctx.fillStyle = '#06101a'; ctx.fillText(String(s.rank), px, py + 0.5)
+        // label = absolute structure score (0-99), not the rank
+        ctx.fillStyle = '#06101a'
+        ctx.fillText(String(Math.min(99, Math.round(s.score * 100))), px, py + 0.5)
+        ctx.globalAlpha = 1
       }
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
     }
@@ -608,6 +618,16 @@ export default function ChartCanvas() {
   }
 
   const effRef = refTime != null ? refTime : (tide ? referenceNow(tide) : Date.now())
+  // keep the draw loop's notion of "now" in sync with the slider so pins re-tint live
+  useEffect(() => { effTimeRef.current = effRef; scheduleDraw() }, [effRef])
+
+  // live tide quality for the active species at the slider time (drives the status chip)
+  const activeSp = SPECIES.find((s) => s.key === speciesKey) || null
+  const tideFit = tide && activeSp ? tideFitAt(tide, activeSp, effRef) : null
+  const fitLabel = tideFit == null ? null
+    : tideFit >= 0.66 ? 'prime tide now'
+    : tideFit >= 0.33 ? 'fair tide now'
+    : 'slack / off — pins dimmed'
 
   return (
     <div className={`chart ${showTide ? 'tide-open' : ''}`} ref={wrapRef}>
@@ -647,7 +667,11 @@ export default function ChartCanvas() {
           </button>
         )}
         {scoring && <span className="chip-status">finding spots…</span>}
-        {!scoring && speciesKey && !zoneSpots &&
+        {!scoring && fitLabel &&
+          <span className={`chip-status fit-${tideFit >= 0.66 ? 'hi' : tideFit >= 0.33 ? 'mid' : 'lo'}`}>
+            🌊 {fitLabel}
+          </span>}
+        {!scoring && speciesKey && !fitLabel && !zoneSpots &&
           <span className="chip-status">tap a pin · zoom re-ranks</span>}
       </div>
 

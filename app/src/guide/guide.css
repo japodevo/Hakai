@@ -16,6 +16,10 @@
 .guide-head b { font-size: 17px; }
 .guide-head span { color: var(--muted); }
 .guide-intro { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 12px 0 18px; }
+.guide-howto { margin: 14px 0 8px; }
+.guide-howto h2 { font-size: 16px; margin: 0 0 8px; }
+.guide-howto ol { margin: 0; padding-left: 20px; }
+.guide-howto li { font-size: 13.5px; line-height: 1.5; margin-bottom: 8px; color: #dcecf8; }
 
 .guide-species {
   border: 1px solid var(--line); border-left-width: 4px;
@@ -47,6 +51,18 @@
 .greg summary { cursor: pointer; color: var(--accent); }
 .greg p { color: var(--muted); line-height: 1.5; margin-top: 8px; }
 .gconf { color: var(--muted); font-size: 11px; margin-top: 10px; font-style: italic; }
+.gdetails { margin: 4px 0 2px; font-size: 12.5px; }
+.gdetails summary { cursor: pointer; color: #9fc0d8; font-size: 12px; padding: 2px 0; }
+.gdetails p { color: var(--muted); line-height: 1.55; margin: 6px 0 4px; }
+
+.guide-glossary { margin: 4px 0 18px; border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; background: rgba(255,255,255,0.02); }
+.guide-glossary summary { cursor: pointer; font-size: 15px; font-weight: 700; color: #dcecf8; }
+.guide-glossary dl { margin: 12px 0 0; }
+.gloss-row { padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.gloss-row:first-child { border-top: none; }
+.gloss-row dt { font-weight: 700; color: #cfe3f2; font-size: 13.5px; }
+.gloss-row dd { margin: 3px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 
 .guide-context { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
 .guide-context h2 { font-size: 16px; }
