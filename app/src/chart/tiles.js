@@ -52,6 +52,12 @@ export async function loadTile(manifest, t) {
     return v === NODATA ? null : (-v / SCALE) * EXAG
   }
 
+  // separate crisp contour overlay (drawn with smoothing OFF over the smooth relief)
+  const contour = document.createElement('canvas')
+  contour.width = W; contour.height = H
+  const cimg = contour.getContext('2d').createImageData(W, H)
+  const CINT = 10   // contour interval, metres (majors every 50 m)
+
   let dmin = Infinity, dmax = -Infinity
   for (let i = 0; i < depths.length; i++) {
     const dm = depths[i], o = i * 4
@@ -86,7 +92,18 @@ export async function loadTile(manifest, t) {
     const hs = (-dzdx * LX - dzdy * LY + LZ) / Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1)
     const f = Math.min(1.4, Math.max(0.45, 1 + (hs - FLAT) * 1.6))
     img.data[o] = r * f; img.data[o + 1] = g * f; img.data[o + 2] = b * f; img.data[o + 3] = 255
+
+    // contour: mark a cell where its depth band differs from the E/S neighbour
+    const band = Math.floor(m / CINT)
+    const mr = zr == null ? m : -zr / EXAG
+    const md = zd == null ? m : -zd / EXAG
+    if (Math.floor(mr / CINT) !== band || Math.floor(md / CINT) !== band) {
+      const major = band % 5 === 0    // every 50 m
+      cimg.data[o] = 6; cimg.data[o + 1] = 18; cimg.data[o + 2] = 28
+      cimg.data[o + 3] = major ? 165 : 85
+    }
   }
   ctx.putImageData(img, 0, 0)
-  return { canvas, depths, src, dmin, dmax }
+  contour.getContext('2d').putImageData(cimg, 0, 0)
+  return { canvas, contour, depths, src, dmin, dmax }
 }

@@ -271,6 +271,12 @@ export default function ChartCanvas() {
     for (const h of heatRef.current) {
       ctx.drawImage(h.canvas, h.col * T, h.row * T)
     }
+    // depth contour lines — crisp (no smoothing) over the smooth relief
+    ctx.imageSmoothingEnabled = false
+    for (const { t, contour } of tilesRef.current.values()) {
+      if (contour) ctx.drawImage(contour, t.col * T, t.row * T)
+    }
+    ctx.imageSmoothingEnabled = true
 
     // GPS own-ship marker (screen space)
     const p = posRef.current

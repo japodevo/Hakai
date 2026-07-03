@@ -59,9 +59,12 @@ export function fmtDepth(m, units) {
 }
 
 // Depth (metres) -> [r,g,b]. Shallow = light, deep = dark blue.
+// Finer gradation through the 0-60 m fishing zone so subtle structure reads.
 const STOPS = [
-  [0, [198, 236, 255]], [10, [120, 200, 240]], [25, [64, 156, 214]],
-  [50, [36, 110, 178]], [100, [24, 74, 140]], [200, [16, 44, 96]], [400, [8, 22, 56]],
+  [0, [201, 240, 255]], [5, [150, 220, 248]], [10, [110, 198, 240]],
+  [15, [80, 180, 230]], [20, [56, 160, 218]], [30, [40, 135, 200]],
+  [40, [32, 112, 182]], [60, [24, 86, 158]], [100, [18, 64, 130]],
+  [150, [14, 48, 104]], [200, [12, 38, 84]], [400, [8, 22, 56]],
 ]
 export function depthColor(m) {
   if (m <= STOPS[0][0]) return STOPS[0][1]
