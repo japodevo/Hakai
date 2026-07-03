@@ -4,9 +4,11 @@ import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import { SPECIES } from '../scoring/species.js'
 import { computeSpots } from '../scoring/score.js'
-import { loadTides } from '../tides/tides.js'
+import { loadTides, phaseNow } from '../tides/tides.js'
 import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
+import { allCatches, putCatch, deleteCatch, newId } from '../catch/db.js'
+import CatchLog from '../catch/CatchLog.jsx'
 import './chart.css'
 
 // Chart renderer: pans/zooms the pre-rendered bathy tiles on a canvas and draws
@@ -43,8 +45,48 @@ export default function ChartCanvas() {
   const [activeSpot, setActiveSpot] = useState(null)
   const [tide, setTide] = useState(null)
   const [showTide, setShowTide] = useState(false)
+  const [catches, setCatches] = useState([])
+  const [showLog, setShowLog] = useState(false)
+  const catchesRef = useRef([])
+  const tideRef = useRef(null)
 
   useEffect(() => { loadTides().then(setTide) }, [])
+  useEffect(() => { tideRef.current = tide }, [tide])
+  useEffect(() => { allCatches().then(setCatches).catch(() => {}) }, [])
+  useEffect(() => { catchesRef.current = catches; scheduleDraw() }, [catches])
+
+  // Depth (m) under a lat/lon from the loaded tiles, or null if unsurveyed.
+  function depthAt(lat, lon) {
+    const man = manifestRef.current
+    if (!man || lat == null) return null
+    const [E, N] = lonLatToUtm(lon, lat, epsgRef.current)
+    const fx = Math.floor((E - man.origin[0]) / man.res[0])
+    const fy = Math.floor((man.origin[1] - N) / man.res[1])
+    if (fx < 0 || fy < 0 || fx >= man.full.width || fy >= man.full.height) return null
+    const T = man.tileSize
+    const tile = tilesRef.current.get(`${man.layer}_${Math.floor(fx / T)}_${Math.floor(fy / T)}`)
+    if (!tile) return null
+    const lx = fx - Math.floor(fx / T) * T, ly = fy - Math.floor(fy / T) * T
+    const dm = tile.depths[ly * tile.t.w + lx]
+    return dm === man.depth.nodata ? null : dm / man.depth.scale
+  }
+  function getCapture() {
+    const p = posRef.current
+    return {
+      ts: Date.now(),
+      lat: p ? p.lat : null,
+      lon: p ? p.lon : null,
+      depthM: p ? depthAt(p.lat, p.lon) : null,
+      tidePhase: tideRef.current ? phaseNow(tideRef.current, Date.now()) : null,
+    }
+  }
+  async function saveCatch(fields, snap) {
+    const entry = { id: newId(), ...snap, ...fields, length: fields.length ? Number(fields.length) : null }
+    try { await putCatch(entry); setCatches(await allCatches()) } catch (e) { console.warn('save catch failed', e) }
+  }
+  async function removeCatch(id) {
+    try { await deleteCatch(id); setCatches(await allCatches()) } catch (e) { console.warn('delete catch failed', e) }
+  }
 
   useEffect(() => {
     posRef.current = pos
@@ -173,6 +215,22 @@ export default function ChartCanvas() {
         ctx.fillStyle = '#06101a'; ctx.fillText(String(s.rank), px, py + 0.5)
       }
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+    }
+
+    // logged catches (own history) — small amber rings
+    const cs = catchesRef.current
+    if (cs && cs.length) {
+      for (const c of cs) {
+        if (c.lat == null) continue
+        const [E, N] = lonLatToUtm(c.lon, c.lat, epsgRef.current)
+        const fx = (E - man.origin[0]) / man.res[0]
+        const fy = (man.origin[1] - N) / man.res[1]
+        const px = fx * scale + tx, py = fy * scale + ty
+        if (px < -12 || py < -12 || px > cw + 12 || py > ch + 12) continue
+        ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2)
+        ctx.fillStyle = '#ffcf6b'; ctx.fill()
+        ctx.lineWidth = 1.5; ctx.strokeStyle = '#06101a'; ctx.stroke()
+      }
     }
   }
 
@@ -414,6 +472,8 @@ export default function ChartCanvas() {
       </div>
 
       <div className="chart-controls">
+        <button className={showLog ? 'primary' : ''} onClick={() => setShowLog((v) => !v)}
+          title="Catch log">🎣</button>
         <button className={showTide ? 'primary' : ''} onClick={() => setShowTide((v) => !v)}
           title="Tides">🌊</button>
         <button onClick={() => setUnits((u) => (u === 'm' ? 'ft' : 'm'))}
@@ -449,6 +509,13 @@ export default function ChartCanvas() {
       {activeSpot && speciesRef.current && (
         <SpotCard spot={activeSpot} species={speciesRef.current} units={units} tide={tide}
           onClose={() => setActiveSpot(null)} />
+      )}
+
+      {showLog && (
+        <CatchLog catches={catches}
+          defaultSpecies={(SPECIES.find((s) => s.key === speciesKey) || {}).label}
+          getCapture={getCapture} onSave={saveCatch} onDelete={removeCatch}
+          units={units} onClose={() => setShowLog(false)} />
       )}
     </div>
   )

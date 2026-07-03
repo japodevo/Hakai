@@ -89,6 +89,24 @@ export function referenceNow(tide) {
   return now
 }
 
+// The tide phase at a moment (for auto-tagging a catch): high/low slack, flood, ebb.
+export function phaseNow(tide, now) {
+  if (!tide || !tide.hilo || tide.hilo.length < 2) return null
+  let near = null, nd = Infinity
+  for (const e of tide.hilo) {
+    const d = Math.abs(e.t - now)
+    if (d < nd) { nd = d; near = e }
+  }
+  if (near && nd <= SLACK_HALF) return `${near.type === 'high' ? 'high' : 'low'} slack`
+  let prev = null, next = null
+  for (const e of tide.hilo) {
+    if (e.t <= now) prev = e
+    else { next = e; break }
+  }
+  if (prev && next) return next.v > prev.v ? 'flood' : 'ebb'
+  return null
+}
+
 export function dayBounds(ms) {
   const d = new Date(ms)
   d.setHours(0, 0, 0, 0)

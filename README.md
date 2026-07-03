@@ -28,7 +28,7 @@ data/              generated tiles + manifests (mostly gitignored)
 | **M2** | App shell: Vite PWA, chart renderer, pan/zoom, GPS marker | **in progress** — Vite+React PWA scaffolded; canvas renderer (pan/zoom/pinch), GPS own-ship marker, tap-to-read depth/source, `storage.persist()`. Needs `npm install` + run on the Mac |
 | **M3** | Scoring on real data: species chips, ranked pins, spot cards | **in progress** — verified chinook/coho/lingcod profiles → on-device terrain analysis (slope/prominence/adjacency) → scoring engine → ranked spot pins + depth/tide/tactic cards. Needs a run on the Mac to tune |
 | **M4** | Tides: prefetch + window strip + spot×tide recs | **in progress** — tide engine (slack / moving-water windows from IWLS prefetch), day tide-strip chart, spot cards show timed windows ("Flood · 1:45–3:45 PM"). Needs `fetch_tides.py --from … --to …` run for your trip dates |
-| M5 | Catch log + export | not started |
+| **M5** | Catch log + export | **in progress** — one-tap logging (auto GPS + depth-under-boat + tide-phase + timestamp), IndexedDB (offline), catches plotted on the chart, CSV/JSON export. Needs a run to exercise |
 | M6 | Offline hardening + airplane-mode acceptance test | not started |
 
 ## M1 quick start
