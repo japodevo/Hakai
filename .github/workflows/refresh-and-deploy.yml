@@ -24,6 +24,10 @@ on:
         required: false
   schedule:
     - cron: "17 14 * * 1" # Mondays 14:17 UTC (~07:17 Pacific)
+  push:
+    # self-test: any change to this automation runs it once end-to-end
+    paths:
+      - ".github/workflows/refresh-and-deploy.yml"
 
 permissions:
   contents: write # push the built site to the gh-pages branch
