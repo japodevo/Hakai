@@ -1,4 +1,5 @@
 import { speciesWindows, nextWindow, phaseNow, fmtTime, dayBounds } from './tides.js'
+import { sunAltitudeDeg, sunTimes } from './sun.js'
 
 // which species a phase favours, weighted by its tide prefs
 function phaseWeightFor(sp, phase) {
@@ -47,8 +48,21 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
     const wins = shadeSp
       ? speciesWindows(tide, shadeSp).filter((w) => w.weight >= 0.6 && w.end >= d0 && w.start <= d1)
       : []
+    // night shading: scan sun altitude across the day, darken where below -6°
+    const night = []
+    let seg = null
+    for (let t = d0; t <= d1; t += 15 * 60000) {
+      if (sunAltitudeDeg(t) < -6) { if (!seg) seg = { a: t }; seg.b = t }
+      else if (seg) { night.push(seg); seg = null }
+    }
+    if (seg) night.push(seg)
     body = (
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="tide-svg">
+        {night.map((s, i) => {
+          const x = Math.max(0, X(s.a)); const wd = Math.min(W, X(s.b)) - x
+          return <rect key={`n${i}`} x={x} y="0" width={Math.max(0, wd)} height={H}
+            fill="#000" opacity="0.28" />
+        })}
         {wins.map((w, i) => {
           const x = Math.max(0, X(w.start)); const wd = Math.min(W, X(w.end)) - x
           return <rect key={i} x={x} y="0" width={Math.max(0, wd)} height={H}
@@ -105,6 +119,9 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
 
       <div className="tide-hilo">
         {hilo.map((e, i) => <span key={i}>{e.type === 'high' ? 'H' : 'L'} {fmtTime(e.t)}</span>)}
+        {(() => { const st = sunTimes(d0, d1); return st.rise ? (
+          <span className="tide-sun">☀ {fmtTime(st.rise)}–{st.set ? fmtTime(st.set) : '…'}</span>
+        ) : null })()}
         <span className="tide-lagnote">current turns ~40 min after H/L</span>
       </div>
     </div>

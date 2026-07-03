@@ -5,6 +5,7 @@
 import { analyzeTile } from './terrain.js'
 import { utmToLonLat } from '../chart/proj.js'
 import { tideFitAt } from '../tides/tides.js'
+import { lightFit } from '../tides/sun.js'
 
 const PEAK_MIN_SCORE = 0.28
 const DEFAULT_MIN_DIST_M = 220
@@ -33,10 +34,16 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
   const minScore = opts.minScore != null ? opts.minScore : PEAK_MIN_SCORE
   const B = opts.bounds || null   // {x0,y0,x1,y1} in full-raster cells; only peaks inside
 
+  // Bottom preference via the rugosity proxy: rough (detrended) bottom reads as rock,
+  // smooth as sediment. Normalised to the species' best-loved bottom so the multiplier
+  // tops out at 1 — it can only suppress wrong bottom, never inflate.
+  const bp = sc.bottom || {}
+  const maxPref = Math.max(bp.rock || 0, bp.gravel || 0, bp.soft || 0) || 1
+
   const candidates = []
   for (const tile of tiles) {
     const { t, depths, src } = tile
-    const { dmM, scoreable, promN, slopeN, adjN, flatN } =
+    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN } =
       analyzeTile(depths, src, t.w, t.h, { nodata: depth.nodata, scale: depth.scale, resM, scoreTiers })
 
     const S = new Float32Array(t.w * t.h)
@@ -46,9 +53,10 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
       const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
         sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
+      const bFit = ((bp.rock || 0) * rugosN[i] + (bp.soft || 0) * (1 - rugosN[i])) / maxPref
       // Depth gates harder now (0.2..1.0) so species with different depth bands pick
       // genuinely different spots instead of all landing on the same big structure.
-      S[i] = (0.2 + 0.8 * g) * terr
+      S[i] = (0.2 + 0.8 * g) * terr * (0.55 + 0.45 * bFit)
     }
 
     // local maxima (3x3), skipping the 1-px tile border to avoid seam artefacts
@@ -82,7 +90,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
         const dropDirDeg = (Math.atan2(adx, -ady) * 180 / Math.PI + 360) % 360
         candidates.push({
           fx: FX, fy: FY, s, dM: dmM[i], dropDirDeg,
-          prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i],
+          prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i], rugos: rugosN[i],
         })
       }
     }
@@ -112,7 +120,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       rel: maxScore > 0 ? c.s / maxScore : 0,   // 0..1 relative to the top spot
       structure,
       dropDirDeg: c.dropDirDeg,
-      comp: { prom: c.prom, slope: c.slope, adj: c.adj, flat: c.flat },
+      comp: { prom: c.prom, slope: c.slope, adj: c.adj, flat: c.flat, rugos: c.rugos },
     }
   })
 }
@@ -147,12 +155,12 @@ export function seasonFit(species, timeMs) {
 }
 
 // The live "bite score" for a spot at a moment: its structural score gated by how well
-// the tide (and season) suit this species right now. This is what the pin/card show, so
-// scrubbing the time slider changes the numbers — and chinook vs lingcod differ because
-// their tide preferences differ even on the same piece of structure.
+// the tide, the LIGHT, and the season suit this species right now. This is what the
+// pin/card show, so scrubbing the time slider changes the numbers — dawn on a tide
+// change lights up; flat midday sun at slack goes cold.
 export function liveScore(baseScore, species, tide, timeMs) {
   const tideMult = tide ? (0.35 + 0.65 * tideFitAt(tide, species, timeMs)) : 1
-  return baseScore * tideMult * seasonFit(species, timeMs)
+  return baseScore * tideMult * lightFit(species, timeMs) * seasonFit(species, timeMs)
 }
 
 // A plain-language tide hint from the species' best phases (until timed windows load).
@@ -191,6 +199,12 @@ export function explain(species, spot) {
   const bits = []
   if (top.length) bits.push(top.join(' with '))
   if (near) bits.push(`in the ~${Math.round(species.scoring.depthMeanM)} m band ${species.label.toLowerCase()} favour`)
+  // bottom-hardness read (rugosity proxy), when it matters to this species
+  const rug = spot.comp.rugos
+  if (rug != null && (species.scoring.bottom?.rock ?? 0) >= 0.7) {
+    if (rug > 0.45) bits.push('over hard, broken bottom (reads as rock)')
+    else if (rug < 0.15) bits.push('though the bottom reads smooth (likely sand/mud) — confirm rock on the sounder')
+  }
   return bits.length ? `Picked for ${bits.join(', ')}.` : 'Structure inside the target depth band.'
 }
 
@@ -210,10 +224,12 @@ export function buildHeat(manifest, tiles, species) {
   const scoreTiers = manifest.source ? manifest.source.scoreTiers : null
   const sc = species.scoring
   const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency + sc.weights.flatness) || 1
+  const bp = sc.bottom || {}
+  const maxPref = Math.max(bp.rock || 0, bp.gravel || 0, bp.soft || 0) || 1
   const out = []
   for (const tile of tiles) {
     const { t, depths, src } = tile
-    const { dmM, scoreable, promN, slopeN, adjN, flatN } =
+    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN } =
       analyzeTile(depths, src, t.w, t.h, { nodata: depth.nodata, scale: depth.scale, resM, scoreTiers })
     const canvas = document.createElement('canvas')
     canvas.width = t.w; canvas.height = t.h
@@ -226,7 +242,8 @@ export function buildHeat(manifest, tiles, species) {
       const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
       const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
         sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
-      const [r, gg, b, a] = heatColor((0.2 + 0.8 * g) * terr)
+      const bFit = ((bp.rock || 0) * rugosN[i] + (bp.soft || 0) * (1 - rugosN[i])) / maxPref
+      const [r, gg, b, a] = heatColor((0.2 + 0.8 * g) * terr * (0.55 + 0.45 * bFit))
       if (a <= 1) continue
       const o = i * 4
       img.data[o] = r; img.data[o + 1] = gg; img.data[o + 2] = b; img.data[o + 3] = a

@@ -21,6 +21,8 @@ const GLOSSARY = [
   ['Max flow / moving water', 'The middle of a tide, halfway between high and low, when current runs hardest. It sweeps bait onto structure.'],
   ['Slack lag', 'In a strong passage the water keeps moving after the tide height turns — current slack arrives ~40 min after the high/low in the tide table. The app shifts all its windows to current time for you.'],
   ['Spring / neap tides', 'Around full and new moon (springs) the tide range is big and currents rip; at quarter moons (neaps) both are gentle. The app scores a big spring push higher than a soft neap one.'],
+  ['First light / low light', 'The grey band around dawn and dusk when salmon feed hardest. The bite score peaks then, drops in flat midday sun, and drops harder in full dark; the tide chart shades night. Lingcod care less — they hunt by sight all day.'],
+  ['Rugosity', 'How rough/broken the bottom is. The app measures fine texture in the depth data as a stand-in for rock (rough) vs sand/mud (smooth) — lingcod demand rock, so smooth-bottom spots score down for them. Confirm on your sounder.'],
   ['Chart datum', 'The zero line depths are measured from (roughly the lowest tide). Real water is usually deeper than the number by the tide height.'],
   ['Mooching', 'Slow-trolling or drifting a weighted, cut-bait or whole herring so it spins — a classic no-downrigger salmon method.'],
   ['Jigging', 'Dropping a heavy metal lure to the bottom and working it up-and-down. Deadly on lingcod and rockfish over structure.'],
@@ -131,7 +133,8 @@ export default function GuidePage({ onClose }) {
             timed tide window. <b>Heat</b> shows the whole score field.</li>
           <li><b>🌊 Tides</b> → the day's curve. Use <b>‹ ›</b> to change day and drag the
             <b> slider</b> to any time. The number in each pin is a <b>“bite score now”</b> —
-            the spot's structure times how well the tide suits that species at that moment —
+            the spot's structure times how well the tide <b>and the light</b> (first light /
+            dusk beats midday; night shades dark on the chart) suit that species then —
             so it <b>rises in a good window and drops at slack / off-tide</b>, and the pins
             brighten and dim with it. (Spot <i>locations</i> are fixed structure — the tide
             changes <i>when</i> to be there, not where.)</li>

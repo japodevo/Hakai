@@ -206,6 +206,7 @@
 .tide-hilo { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px;
   font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tide-lagnote { font-style: italic; opacity: 0.85; }
+.tide-sun { color: #ffcf6b; }
 .tide-empty { color: var(--muted); font-size: 12px; padding: 20px 0; text-align: center; }
 .tide-slider { width: 100%; margin: 6px 0 2px; accent-color: var(--warn); height: 28px; }
 .tide-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

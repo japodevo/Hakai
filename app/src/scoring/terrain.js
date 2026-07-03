@@ -11,6 +11,12 @@ const PROM_CAP = 35      // m of relief that maps to prominence = 1
 const SLOPE_CAP = 1.0    // rise/run (~45°) that maps to slope = 1
 const PROM_RADIUS_M = 150
 const ADJ_RADIUS_M = 60
+// Rugosity (bottom-hardness proxy): mean |depth − local 3×3 mean| over a small
+// window. Subtracting the local mean removes planar tilt, so a smooth steep wall
+// reads ~0 while broken rock reads high — texture, not slope. Multibeam over rock
+// carries decimetre-scale texture the 10 m NONNA grid preserves; sand/mud is smooth.
+const RUGOSITY_CAP = 0.5     // m of mean residual relief that reads as fully rocky
+const RUGOSITY_RADIUS_M = 30
 
 export function analyzeTile(depths, src, w, h, opts) {
   const { nodata, scale, resM, scoreTiers } = opts
@@ -107,5 +113,37 @@ export function analyzeTile(depths, src, w, h, opts) {
     }
   }
 
-  return { dmM, scoreable, promN, slopeN, adjN, flatN }
+  // --- rugosity: detrended micro-relief, smoothed over a small window ---------
+  const resid = new Float32Array(n)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x
+      if (!hasDepth[i]) continue
+      const bm3 = boxMean(x - 1, y - 1, x + 1, y + 1)
+      if (bm3 === bm3) resid[i] = Math.abs(dmM[i] - bm3)
+    }
+  }
+  // summed-area table over the residual (reuse the valid-count table C)
+  const S2 = new Float64Array(sw * (h + 1))
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = (y + 1) * sw + (x + 1)
+      S2[a] = resid[y * w + x] + S2[y * sw + (x + 1)] + S2[(y + 1) * sw + x] - S2[y * sw + x]
+    }
+  }
+  const rr = Math.max(2, Math.round(RUGOSITY_RADIUS_M / resM))
+  const rugosN = new Float32Array(n)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x
+      if (!hasDepth[i]) continue
+      const x0 = Math.max(0, x - rr), y0 = Math.max(0, y - rr)
+      const x1 = Math.min(w - 1, x + rr), y1 = Math.min(h - 1, y + rr)
+      const s = S2[(y1 + 1) * sw + (x1 + 1)] - S2[y0 * sw + (x1 + 1)] - S2[(y1 + 1) * sw + x0] + S2[y0 * sw + x0]
+      const c = C[(y1 + 1) * sw + (x1 + 1)] - C[y0 * sw + (x1 + 1)] - C[(y1 + 1) * sw + x0] + C[y0 * sw + x0]
+      if (c > 0) rugosN[i] = Math.min(1, (s / c) / RUGOSITY_CAP)
+    }
+  }
+
+  return { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN }
 }

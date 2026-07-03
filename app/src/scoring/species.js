@@ -54,6 +54,11 @@ export const SPECIES = [
         "ebb": 0.7,
         "maxFlow": 0.3,
         "change": 1
+      },
+      "light": {
+        "night": 0.5,
+        "lowLight": 1,
+        "day": 0.75
       }
     },
     "structurePref": [
@@ -161,6 +166,11 @@ export const SPECIES = [
         "ebb": 0.9,
         "maxFlow": 0.4,
         "change": 0.45
+      },
+      "light": {
+        "night": 0.45,
+        "lowLight": 1,
+        "day": 0.8
       }
     },
     "structurePref": [
@@ -271,6 +281,11 @@ export const SPECIES = [
         "ebb": 0.55,
         "maxFlow": 0.2,
         "change": 1
+      },
+      "light": {
+        "night": 0.55,
+        "lowLight": 0.9,
+        "day": 1
       }
     },
     "structurePref": [

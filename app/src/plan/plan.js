@@ -2,6 +2,7 @@
 // × tide windows (when) into one time-ordered game plan for a day. Each tide window
 // is matched to the species it suits and that species' best spot.
 import { speciesWindows, dayBounds, referenceNow } from '../tides/tides.js'
+import { lightFit, lightBand } from '../tides/sun.js'
 
 function inSeason(species, monthIdx) {
   return (species.seasonMonths || []).includes(monthIdx)
@@ -30,8 +31,11 @@ export function buildPlan(spotsBySpecies, tide, speciesList, opts = {}) {
     for (const w of speciesWindows(tide, s)) {
       if (w.weight < 0.6 || w.end < d0 || w.start > d1) continue
       const key = Math.round(w.center / 60000)
-      const g = groups.get(key) || { start: w.start, end: w.end, center: w.center, label: w.label, phase: w.phase, picks: [] }
-      g.picks.push({ species: s, spot: best, score: w.weight * best.rel, weight: w.weight, inSeason: inSeason(s, month) })
+      // dawn/dusk windows carry the prime-light tag and outrank equal midday tides
+      const band = lightBand(w.center)
+      const label = w.label + (band === 'lowLight' ? ' · ☀ prime light' : band === 'night' ? ' · dark' : '')
+      const g = groups.get(key) || { start: w.start, end: w.end, center: w.center, label, phase: w.phase, picks: [] }
+      g.picks.push({ species: s, spot: best, score: w.weight * best.rel * lightFit(s, w.center), weight: w.weight, inSeason: inSeason(s, month) })
       groups.set(key, g)
     }
   }
