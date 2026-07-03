@@ -623,11 +623,10 @@ export default function ChartCanvas() {
           title="Tides">🌊</button>
         <button onClick={() => setUnits((u) => (u === 'm' ? 'ft' : 'm'))}
           title="Depth units">{units}</button>
-        <button onClick={() => zoomCenter(1.6)} title="Zoom in">+</button>
-        <button onClick={() => zoomCenter(1 / 1.6)} title="Zoom out">−</button>
         <button className={`primary gps-${gpsState}`} onClick={recenter}
           title="Center on GPS">◎</button>
         <button onClick={fitView} title="Fit whole area">⤢</button>
+        <button onClick={() => window.location.reload()} title="Refresh / check for update">↻</button>
       </div>
 
       {readout && (

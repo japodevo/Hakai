@@ -1,0 +1,55 @@
+.guide {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  background: #0b1622;
+  padding: 0 16px calc(28px + var(--safe-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+.guide-head {
+  position: sticky; top: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0 12px; margin-bottom: 4px;
+  background: #0b1622; border-bottom: 1px solid var(--line);
+}
+.guide-head b { font-size: 17px; }
+.guide-head span { color: var(--muted); }
+.guide-intro { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 12px 0 18px; }
+
+.guide-species {
+  border: 1px solid var(--line); border-left-width: 4px;
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 16px;
+  background: rgba(255,255,255,0.02);
+}
+.guide-species header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.guide-species h2 { font-size: 18px; margin: 0; }
+.gdot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+.glocal { color: var(--muted); font-size: 12px; }
+.grow { display: flex; gap: 12px; align-items: baseline; margin-top: 8px; }
+.gk { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  width: 78px; flex: 0 0 auto; }
+.gnote { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 6px 0 2px; }
+
+.gstruct { margin-top: 10px; }
+.gstruct-row { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; }
+.gstruct-name { width: 96px; flex: 0 0 auto; color: #cfe3f2; text-transform: capitalize; }
+.gbar { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.gbar b { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+
+.gtactics { margin-top: 12px; }
+.gtactic { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 8px 10px; margin: 6px 0; font-size: 13px; line-height: 1.45; }
+.gtactic b { text-transform: capitalize; }
+.gsub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.gsub em { color: #9fc0d8; font-style: normal; }
+
+.greg { margin-top: 12px; font-size: 12.5px; }
+.greg summary { cursor: pointer; color: var(--accent); }
+.greg p { color: var(--muted); line-height: 1.5; margin-top: 8px; }
+.gconf { color: var(--muted); font-size: 11px; margin-top: 10px; font-style: italic; }
+
+.guide-context { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
+.guide-context h2 { font-size: 16px; }
+.guide-context h3 { font-size: 13px; margin: 16px 0 4px; color: #cfe3f2; }
+.guide-disclaimer { color: var(--warn); font-size: 12px; line-height: 1.5; margin: 20px 0 0;
+  border: 1px solid #5a3a24; background: rgba(60,30,20,0.35); border-radius: 10px; padding: 10px 12px; }
