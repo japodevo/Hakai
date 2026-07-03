@@ -9,8 +9,11 @@ app/node_modules/
 app/dist/
 app/dev-dist/
 app/.vite/
-app/public/data/        # synced from ../data by sync-data.sh (generated)
+# synced from ../data by sync-data.sh (generated)
+app/public/data/
 node_modules/
+# lockfile lives here (npm run from app/)
+app/package-lock.json
 
 # --- Generated data (see CLAUDE.md: commit the manifest, ignore raw + tiles) ---
 # Raw + reprojected/mosaicked rasters — large, regenerable from source.
@@ -25,6 +28,12 @@ data/tiles/**/*.src.gz
 data/tiles/*.bin.gz
 data/tiles/*.mask.gz
 data/tiles/*.src.gz
+
+# Prefetched app-data JSON — regenerable by the pipeline scripts (fetch_tides.py,
+# fetch_coastline.py); synced into app/public/data at build time.
+data/tides.json
+data/coastline.json
+data/places.json
 
 # --- OS / editor cruft ---
 .DS_Store
