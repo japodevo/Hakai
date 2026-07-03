@@ -46,6 +46,14 @@ export default function ChartCanvas() {
   const [activeSpot, setActiveSpot] = useState(null)
   const [tide, setTide] = useState(null)
   const [showTide, setShowTide] = useState(false)
+  const [noRigger, setNoRigger] = useState(() => {
+    try { return localStorage.getItem('hakai.noRigger') === '1' } catch { return false }
+  })
+  const toggleRigger = () => setNoRigger((v) => {
+    const n = !v
+    try { localStorage.setItem('hakai.noRigger', n ? '1' : '0') } catch { /* private mode */ }
+    return n
+  })
   const [catches, setCatches] = useState([])
   const [showLog, setShowLog] = useState(false)
   const [showPlan, setShowPlan] = useState(false)
@@ -551,6 +559,7 @@ export default function ChartCanvas() {
 
       {activeSpot && speciesRef.current && (
         <SpotCard spot={activeSpot} species={speciesRef.current} units={units} tide={tide}
+          noRigger={noRigger} onToggleRigger={toggleRigger}
           onClose={() => setActiveSpot(null)} />
       )}
 

@@ -4,11 +4,19 @@ import { nextWindow, fmtTime } from '../tides/tides.js'
 
 // Bottom-sheet card for a ranked spot: depth, timed tide window, rationale, tactic,
 // an in/out-of-season badge, and the regs + not-for-nav caveats.
-export default function SpotCard({ spot, species, units, tide, onClose }) {
+export default function SpotCard({ spot, species, units, tide, noRigger, onToggleRigger, onClose }) {
   const depthStr = fmtDepth(spot.depthM, units)
-  const tactic = species.tactics && species.tactics[0]
   const month = new Date().getMonth() + 1
   const inSeason = (species.seasonMonths || []).includes(month)
+
+  // Downrigger-free tactic: prefer a mooch/jig/drift/cast method; if only a
+  // rigger-troll is listed, keep it but add a "how to get deep" tip.
+  const tactics = species.tactics || []
+  const nonRig = tactics.find((t) => /mooch|jig|drift|cast|bucktail|float/i.test(`${t.method} ${t.summary}`))
+  const tactic = noRigger && nonRig ? nonRig : tactics[0]
+  const riggerTip = noRigger && !nonRig
+    ? `No downrigger: reach ${depthStr} with a 4–16 oz trolling weight or a diving planer (Deep Six / Dipsy Diver), or motor-mooch a cut-plug herring down to it.`
+    : null
 
   const nw = tide ? nextWindow(tide, species, Date.now()) : null
   const whenValue = nw
@@ -40,8 +48,13 @@ export default function SpotCard({ spot, species, units, tide, onClose }) {
         <div className="spot-tactic">
           <span className="k">{tactic.method}</span> {tactic.summary}
           {tactic.depthNote ? <div className="spot-tacticsub">{tactic.depthNote}</div> : null}
+          {riggerTip ? <div className="spot-tacticsub warn">{riggerTip}</div> : null}
         </div>
       )}
+
+      <button className="rig-toggle" onClick={onToggleRigger}>
+        Gear: <b>{noRigger ? 'no downriggers' : 'downriggers'}</b> · tap to switch
+      </button>
 
       <div className="spot-note">
         ⚠ Not for navigation. Structure grade: {Math.round(spot.rel * 100)}% of the day's best.
