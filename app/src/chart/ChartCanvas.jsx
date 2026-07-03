@@ -186,7 +186,9 @@ export default function ChartCanvas() {
     ctx.fillStyle = '#06101a'
     ctx.fillRect(0, 0, cw, ch)
 
-    ctx.imageSmoothingEnabled = false
+    // bilinear smoothing so the 10 m cells blend into a relief map, not hard pixels
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
     ctx.setTransform(scale * dpr, 0, 0, scale * dpr, tx * dpr, ty * dpr)
     const T = man.tileSize
     for (const { t, canvas: tc } of tilesRef.current.values()) {

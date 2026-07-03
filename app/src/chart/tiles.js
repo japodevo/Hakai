@@ -34,34 +34,58 @@ export async function loadTile(manifest, t) {
   let src = null
   if (t.src) src = await fetchGz(t.src)
 
+  const W = t.w, H = t.h
   const canvas = document.createElement('canvas')
-  canvas.width = t.w
-  canvas.height = t.h
+  canvas.width = W
+  canvas.height = H
   const ctx = canvas.getContext('2d')
-  const img = ctx.createImageData(t.w, t.h)
+  const img = ctx.createImageData(W, H)
+
+  // --- hillshade (relief) so the seafloor reads as 3-D, not flat pixels -----
+  const cs = manifest.res[0] || 10       // metres per cell
+  const EXAG = 6                         // vertical exaggeration (underwater relief is subtle)
+  // unit light vector for a NW light at 45° altitude (dot-product hillshade — cheap)
+  const LX = -0.5, LY = -0.5, LZ = 0.7071
+  const FLAT = LZ                        // hillshade of flat ground
+  const zAt = (idx) => {                 // exaggerated elevation (shallow = high), null at nodata
+    const v = depths[idx]
+    return v === NODATA ? null : (-v / SCALE) * EXAG
+  }
+
   let dmin = Infinity, dmax = -Infinity
   for (let i = 0; i < depths.length; i++) {
     const dm = depths[i], o = i * 4
     if (dm === NODATA) {
-      const px = i % t.w, py = (i / t.w) | 0
+      const px = i % W, py = (i / W) | 0
       const hatch = ((px + py) & 3) === 0
-      img.data[o] = hatch ? 51 : 11
-      img.data[o + 1] = hatch ? 51 : 22
-      img.data[o + 2] = hatch ? 68 : 34
+      img.data[o] = hatch ? 46 : 13
+      img.data[o + 1] = hatch ? 54 : 22
+      img.data[o + 2] = hatch ? 66 : 32
       img.data[o + 3] = 255
-    } else {
-      const m = dm / SCALE
-      if (m < dmin) dmin = m
-      if (m > dmax) dmax = m
-      let [r, g, b] = depthColor(m)
-      // Low-confidence fill (source code > 1, e.g. NONNA-100): desaturate.
-      if (src && src[i] > 1) {
-        r = Math.round(r * 0.55 + 96 * 0.45)
-        g = Math.round(g * 0.55 + 110 * 0.45)
-        b = Math.round(b * 0.55 + 122 * 0.45)
-      }
-      img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255
+      continue
     }
+    const m = dm / SCALE
+    if (m < dmin) dmin = m
+    if (m > dmax) dmax = m
+    let [r, g, b] = depthColor(m)
+    if (src && src[i] > 1) {   // low-confidence fill: desaturate
+      r = r * 0.55 + 96 * 0.45
+      g = g * 0.55 + 110 * 0.45
+      b = b * 0.55 + 122 * 0.45
+    }
+    // relief shading from the local depth gradient
+    const x = i % W, y = (i / W) | 0
+    const zc = (-m) * EXAG
+    const zl = x > 0 ? zAt(i - 1) : null
+    const zr = x < W - 1 ? zAt(i + 1) : null
+    const zu = y > 0 ? zAt(i - W) : null
+    const zd = y < H - 1 ? zAt(i + W) : null
+    const dzdx = ((zr == null ? zc : zr) - (zl == null ? zc : zl)) / (2 * cs)
+    const dzdy = ((zd == null ? zc : zd) - (zu == null ? zc : zu)) / (2 * cs)
+    // hillshade = dot(surface normal, light) — normal = (-dzdx, -dzdy, 1)
+    const hs = (-dzdx * LX - dzdy * LY + LZ) / Math.sqrt(dzdx * dzdx + dzdy * dzdy + 1)
+    const f = Math.min(1.4, Math.max(0.45, 1 + (hs - FLAT) * 1.6))
+    img.data[o] = r * f; img.data[o + 1] = g * f; img.data[o + 2] = b * f; img.data[o + 3] = 255
   }
   ctx.putImageData(img, 0, 0)
   return { canvas, depths, src, dmin, dmax }
