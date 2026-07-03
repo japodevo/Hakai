@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { loadManifest, loadTile } from './tiles.js'
 import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
+import { SPECIES } from '../scoring/species.js'
+import { computeSpots } from '../scoring/score.js'
+import SpotCard from './SpotCard.jsx'
 import './chart.css'
 
 // Chart renderer: pans/zooms the pre-rendered bathy tiles on a canvas and draws
@@ -17,6 +20,12 @@ export default function ChartCanvas() {
   const pinchRef = useRef(null)             // { dist, cx, cy }
   const drawScheduled = useRef(false)
   const epsgRef = useRef(32609)
+  const spotsRef = useRef([])
+  const speciesRef = useRef(null)
+  const activeSpotRef = useRef(null)
+  const spotsCacheRef = useRef({})
+  const speciesKeyRef = useRef(null)
+  const tilesLoadedRef = useRef(false)
 
   const { pos, error: gpsError, request: requestGps } = useGeolocation()
   const posRef = useRef(null)
@@ -26,6 +35,10 @@ export default function ChartCanvas() {
   const [units, setUnits] = useState('m')
   const [legendOpen, setLegendOpen] = useState(true)
   const [gpsState, setGpsState] = useState('off')  // off | acquiring | active
+  const [speciesKey, setSpeciesKey] = useState(null)
+  const [spots, setSpots] = useState([])
+  const [scoring, setScoring] = useState(false)
+  const [activeSpot, setActiveSpot] = useState(null)
 
   useEffect(() => {
     posRef.current = pos
@@ -33,6 +46,32 @@ export default function ChartCanvas() {
     scheduleDraw()
   }, [pos])
   useEffect(() => { unitsRef.current = units }, [units])
+  useEffect(() => { spotsRef.current = spots; scheduleDraw() }, [spots])
+  useEffect(() => { activeSpotRef.current = activeSpot; scheduleDraw() }, [activeSpot])
+  useEffect(() => {
+    speciesKeyRef.current = speciesKey
+    setActiveSpot(null)
+    runScoring(speciesKey)
+  }, [speciesKey])
+
+  function runScoring(key) {
+    const man = manifestRef.current
+    const sp = SPECIES.find((s) => s.key === key) || null
+    speciesRef.current = sp
+    if (!sp) { setSpots([]); return }
+    if (!man || !tilesLoadedRef.current) return   // will re-run when tiles finish
+    if (spotsCacheRef.current[key]) { setSpots(spotsCacheRef.current[key]); return }
+    setScoring(true)
+    // defer so the "finding spots" spinner paints before the heavy sync compute
+    setTimeout(() => {
+      try {
+        const list = computeSpots(man, [...tilesRef.current.values()], sp)
+        spotsCacheRef.current[key] = list
+        setSpots(list)
+      } catch (e) { console.warn('scoring failed', e) }
+      setScoring(false)
+    }, 30)
+  }
 
   function startGps() { setGpsState('acquiring'); requestGps() }
 
@@ -105,6 +144,30 @@ export default function ChartCanvas() {
     ctx.font = '600 12px -apple-system, system-ui, sans-serif'
     ctx.fillText(nice >= 1000 ? `${nice / 1000} km` : `${nice} m`, bx, by - 9)
     ctx.shadowBlur = 0
+
+    // ranked spot pins for the active species
+    const sp = speciesRef.current
+    const spotList = spotsRef.current
+    if (sp && spotList.length) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.font = '700 12px -apple-system, system-ui, sans-serif'
+      const active = activeSpotRef.current
+      for (const s of spotList) {
+        const px = (s.fx + 0.5) * scale + tx
+        const py = (s.fy + 0.5) * scale + ty
+        if (px < -24 || py < -24 || px > cw + 24 || py > ch + 24) continue
+        const r = s.rank === 1 ? 13 : 10
+        if (active && active.rank === s.rank) {
+          ctx.beginPath(); ctx.arc(px, py, r + 5, 0, Math.PI * 2)
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
+        }
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2)
+        ctx.fillStyle = sp.color; ctx.fill()
+        ctx.lineWidth = 2; ctx.strokeStyle = '#06101a'; ctx.stroke()
+        ctx.fillStyle = '#06101a'; ctx.fillText(String(s.rank), px, py + 0.5)
+      }
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+    }
   }
 
   // ---- load ----------------------------------------------------------------
@@ -140,6 +203,8 @@ export default function ChartCanvas() {
       setStatus(ok === 0
         ? 'no tiles rendered — tile fetch/decompress failed (see console)'
         : null)
+      tilesLoadedRef.current = true
+      if (speciesKeyRef.current) runScoring(speciesKeyRef.current)
       startGps()
     })()
     return () => { cancelled = true }
@@ -243,6 +308,18 @@ export default function ChartCanvas() {
     const man = manifestRef.current
     if (!man) return
     const v = viewRef.current
+
+    // spot pins first — tap one to open its card
+    if (speciesRef.current && spotsRef.current.length) {
+      let best = null, bestD = 1e9
+      for (const s of spotsRef.current) {
+        const px = (s.fx + 0.5) * v.scale + v.tx
+        const py = (s.fy + 0.5) * v.scale + v.ty
+        const d = Math.hypot(px - sx, py - sy)
+        if (d < bestD) { bestD = d; best = s }
+      }
+      if (best && bestD <= 22) { setActiveSpot(best); return }
+    }
     const fx = Math.floor((sx - v.tx) / v.scale)
     const fy = Math.floor((sy - v.ty) / v.scale)
     if (fx < 0 || fy < 0 || fx >= man.full.width || fy >= man.full.height) {
@@ -298,6 +375,22 @@ export default function ChartCanvas() {
       />
       {status && <div className="chart-status">{status}</div>}
 
+      <div className="species-chips">
+        {SPECIES.map((s) => (
+          <button key={s.key}
+            className={`chip ${speciesKey === s.key ? 'active' : ''}`}
+            style={speciesKey === s.key ? { borderColor: s.color, color: '#fff' } : undefined}
+            onClick={() => setSpeciesKey(speciesKey === s.key ? null : s.key)}>
+            <span className="dot" style={{ background: s.color }} />{s.label}
+          </button>
+        ))}
+        {scoring && <span className="chip-status">finding spots…</span>}
+        {!scoring && speciesKey && spots.length > 0 &&
+          <span className="chip-status">{spots.length} spots · tap a pin</span>}
+        {!scoring && speciesKey && spots.length === 0 &&
+          <span className="chip-status">no strong spots in survey</span>}
+      </div>
+
       <div className={`chart-legend ${legendOpen ? '' : 'collapsed'}`}>
         <button className="legend-toggle" onClick={() => setLegendOpen((o) => !o)}>
           Depth {legendOpen ? '▾' : '▸'}
@@ -339,6 +432,11 @@ export default function ChartCanvas() {
       )}
 
       {gpsError && <div className="chart-gps-err">GPS: {gpsError}</div>}
+
+      {activeSpot && speciesRef.current && (
+        <SpotCard spot={activeSpot} species={speciesRef.current} units={units}
+          onClose={() => setActiveSpot(null)} />
+      )}
     </div>
   )
 }
