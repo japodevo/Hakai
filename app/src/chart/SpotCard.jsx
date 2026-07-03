@@ -1,6 +1,6 @@
 import { fmtDepth } from './proj.js'
-import { rationale, tideHint, explain } from '../scoring/score.js'
-import { nextWindow, fmtTime } from '../tides/tides.js'
+import { rationale, tideHint, explain, liveScore } from '../scoring/score.js'
+import { nextWindow, fmtTime, tideFitAt } from '../tides/tides.js'
 
 function Bar({ label, v }) {
   return (
@@ -27,7 +27,12 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
     ? `No downrigger: reach ${depthStr} with a 4–16 oz trolling weight or a diving planer (Deep Six / Dipsy Diver), or motor-mooch a cut-plug herring down to it.`
     : null
 
-  const nw = tide ? nextWindow(tide, species, now || Date.now()) : null
+  const nowMs = now || Date.now()
+  const structPct = Math.round(spot.score * 100)
+  const livePct = Math.min(99, Math.round(liveScore(spot.score, species, tide, nowMs) * 100))
+  const fit = tide ? tideFitAt(tide, species, nowMs) : 1
+  const fitWord = !tide ? null : fit >= 0.66 ? 'prime tide' : fit >= 0.33 ? 'fair tide' : 'slack / off-tide'
+  const nw = tide ? nextWindow(tide, species, nowMs) : null
   const whenValue = nw
     ? `${nw.label.split(' — ')[0]} · ${fmtTime(nw.start)}–${fmtTime(nw.end)}${nw.current ? ' (now)' : ''}`
     : tideHint(species)
@@ -72,12 +77,17 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
       </button>
 
       <div className="spot-score">
-        <b>{Math.round(spot.score * 100)}</b><span>/100 structure score</span>
-        <em>· {Math.round(spot.rel * 100)}% of best in view</em>
+        <b>{livePct}</b><span>/100 bite score now</span>
+        {fitWord ? <em>· {fitWord}</em> : null}
+      </div>
+      <div className="spot-score-sub">
+        Structure {structPct}/100{tide ? ' × the tide right now' : ''} · {Math.round(spot.rel * 100)}% of best in view.
+        {tide ? ' Scrub the 🌊 time slider to see it change through the day.' : ''}
       </div>
 
       <div className="spot-note">
-        ⚠ Not for navigation. Absolute score compares zone-to-zone (same species).
+        ⚠ Not for navigation. Structure score compares zone-to-zone (same species); bite
+        score also folds in the tide at the selected time.
         {species.regsNote ? ` Regs: ${species.regsNote.slice(0, 160)}…` : ' Verify current DFO regs before you fish.'}
       </div>
     </div>

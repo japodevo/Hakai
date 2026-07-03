@@ -18,11 +18,11 @@
 
 .chart-controls {
   position: absolute;
-  right: 14px;
-  bottom: calc(20px + var(--safe-bottom));
-  display: flex; flex-direction: column; gap: 10px;
+  right: 12px;
+  bottom: calc(16px + var(--safe-bottom));
+  display: flex; flex-direction: column; gap: 7px;
 }
-.chart-controls button { width: 52px; height: 52px; font-size: 20px; padding: 0; }
+.chart-controls button { width: 42px; height: 42px; font-size: 17px; padding: 0; }
 .chart-controls button.gps-acquiring { border-color: var(--warn); animation: gpspulse 1.1s ease-in-out infinite; }
 .chart-controls button.gps-active { background: #1b6b4c; border-color: #3fbf88; color: #eafff5; }
 @keyframes gpspulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,207,107,0.5); } 50% { box-shadow: 0 0 0 6px rgba(255,207,107,0); } }
@@ -61,8 +61,8 @@
 .chart-readout {
   position: absolute;
   left: 12px;
-  bottom: calc(20px + var(--safe-bottom));
-  right: 86px;
+  bottom: calc(16px + var(--safe-bottom));
+  right: 66px;
   background: rgba(16, 32, 47, 0.92);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -85,22 +85,27 @@
 }
 
 /* --- species chips (top center) --- */
+/* Stacking order for the floating controls: chips must sit ABOVE the depth legend
+   so a tap in the overlap zone on a narrow phone hits the chip, not the legend. */
+.species-chips { z-index: 25; }
+.chart-controls { z-index: 20; }
+.chart-legend { z-index: 12; }
 .species-chips {
   position: absolute;
-  top: 12px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  justify-content: center; max-width: calc(100% - 24px);
+  top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  justify-content: center; max-width: calc(100% - 116px);
 }
 .species-chips .chip {
-  min-height: 40px; height: 40px; padding: 0 14px; border-radius: 999px;
-  background: rgba(16, 32, 47, 0.92); font-size: 14px; font-weight: 600;
-  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 34px; height: 34px; padding: 0 11px; border-radius: 999px;
+  background: rgba(16, 32, 47, 0.92); font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 7px;
 }
 .species-chips .chip.active { background: #17324a; }
-.species-chips .chip .dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; }
+.species-chips .chip .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 .chip-status {
   background: rgba(16, 32, 47, 0.92); border: 1px solid var(--line);
-  border-radius: 999px; padding: 7px 12px; font-size: 12px; color: var(--muted);
+  border-radius: 999px; padding: 6px 10px; font-size: 11.5px; color: var(--muted);
 }
 .chip-status.fit-hi { color: #7ee0a6; border-color: #2f6b47; }
 .chip-status.fit-mid { color: #ffcf6b; border-color: #6b5a2f; }
@@ -112,13 +117,22 @@
   left: 12px; right: 12px;
   bottom: calc(16px + var(--safe-bottom));
   max-width: 460px; margin: 0 auto;
+  max-height: 78%; overflow-y: auto;   /* tall cards scroll instead of running off-screen */
+  -webkit-overflow-scrolling: touch;
   background: rgba(12, 24, 35, 0.97);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 0 16px 14px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.5);
 }
-.spot-head { display: flex; align-items: center; gap: 12px; }
+/* sticky header keeps the title + × pinned at the top while the body scrolls */
+.spot-head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0 10px; margin-bottom: 2px;
+  background: rgba(12, 24, 35, 0.98); border-bottom: 1px solid var(--line);
+}
+.spot-head .spot-x { width: 40px; height: 40px; min-width: 40px; font-size: 24px; }
 .spot-rank {
   width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
@@ -143,10 +157,11 @@
 .spot-bar span { width: 78px; flex: 0 0 auto; }
 .spot-bar i { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
 .spot-bar b { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-.spot-score { display: flex; align-items: baseline; gap: 6px; margin: 4px 0 10px; }
+.spot-score { display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px; }
 .spot-score b { font-size: 22px; }
 .spot-score span { color: var(--muted); font-size: 12px; }
-.spot-score em { color: var(--muted); font-size: 12px; font-style: normal; }
+.spot-score em { color: var(--warn); font-size: 12px; font-style: normal; }
+.spot-score-sub { color: var(--muted); font-size: 11.5px; line-height: 1.45; margin: 0 0 10px; }
 .spot-tactic { font-size: 13px; line-height: 1.4; background: rgba(255,255,255,0.04);
   border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
 .spot-tactic .k { display: inline-block; margin-right: 4px; text-transform: uppercase; }
@@ -174,13 +189,13 @@
 }
 .tide-strip.empty { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .tide-strip code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 5px; }
-.tide-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 12px; }
+.tide-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; font-size: 12px; }
 .tide-nav { display: flex; align-items: center; gap: 6px; }
-.tide-nav button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line);
+.tide-nav button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line);
   background: rgba(255,255,255,0.05); color: #dcecf8; font-size: 18px; line-height: 1; padding: 0; }
 .tide-nav button:disabled { opacity: 0.35; }
-.tide-date { color: #dcecf8; font-weight: 700; min-width: 96px; text-align: center; }
-.tide-next { font-weight: 700; font-size: 12px; white-space: nowrap; flex: 1; text-align: right; }
+.tide-date { color: #dcecf8; font-weight: 700; min-width: 118px; text-align: center; }
+.tide-next { font-weight: 700; font-size: 12px; margin: 0 0 4px; }
 .tide-slider-label { display: block; font-size: 11px; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.04em; margin-top: 6px; }
 .tide-svg { display: block; width: 100%; height: 84px; }
@@ -196,6 +211,12 @@
 /* when the tide strip is open, lift the spot card above it and hide the tap readout */
 .chart.tide-open .spot-card { bottom: calc(150px + var(--safe-bottom)); }
 .chart.tide-open .chart-readout { display: none; }
+
+/* a bottom sheet (tide / plan / catch / spot card) owns the screen — hide the
+   right-hand control stack so it never overlaps the sheet on a small phone. */
+.chart.sheet-open .chart-controls { display: none; }
+/* sheets sit above the pre-install storage toast (which lives in the app shell) */
+.tide-strip, .spot-card, .catch-sheet, .plan-sheet { z-index: 60; }
 
 /* --- catch log (bottom sheet) --- */
 .catch-sheet {

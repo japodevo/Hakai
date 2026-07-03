@@ -80,11 +80,11 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
           </span>
           <button onClick={() => goDay(1)} disabled={atEnd} aria-label="Next day">›</button>
         </div>
-        {nw && <span className="tide-next" style={{ color: species.color }}>
-          {nw.current ? 'Now: ' : 'Next: '}{nw.label.split(' — ')[0]} {fmtTime(nw.start)}–{fmtTime(nw.end)}
-        </span>}
         <button className="spot-x" onClick={onClose} aria-label="Close">×</button>
       </div>
+      {nw && <div className="tide-next" style={{ color: species.color }}>
+        {nw.current ? 'Now: ' : 'Next: '}{nw.label.split(' — ')[0]} · {fmtTime(nw.start)}–{fmtTime(nw.end)}
+      </div>}
 
       {body}
 

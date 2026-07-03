@@ -10,10 +10,13 @@
 .guide-head {
   position: sticky; top: 0;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 0 12px; margin-bottom: 4px;
+  /* pad past the iPhone status bar / notch so the × is always reachable */
+  padding: calc(14px + var(--safe-top)) 0 12px; margin-bottom: 4px;
   background: #0b1622; border-bottom: 1px solid var(--line);
 }
 .guide-head b { font-size: 17px; }
+/* bigger, unmissable tap target for close */
+.guide-head .spot-x { width: 44px; height: 44px; min-width: 44px; font-size: 26px; }
 .guide-head span { color: var(--muted); }
 .guide-intro { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 12px 0 18px; }
 .guide-howto { margin: 14px 0 8px; }

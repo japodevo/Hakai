@@ -4,6 +4,7 @@
 // from the species profile (and, once a tide prefetch is loaded, timed windows).
 import { analyzeTile } from './terrain.js'
 import { utmToLonLat } from '../chart/proj.js'
+import { tideFitAt } from '../tides/tides.js'
 
 const PEAK_MIN_SCORE = 0.28
 const DEFAULT_MIN_DIST_M = 220
@@ -45,8 +46,9 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
       const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
         sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
-      // depth acts as a soft gate (never fully kills a spot); terrain carries the shape.
-      S[i] = (0.4 + 0.6 * g) * terr
+      // Depth gates harder now (0.2..1.0) so species with different depth bands pick
+      // genuinely different spots instead of all landing on the same big structure.
+      S[i] = (0.2 + 0.8 * g) * terr
     }
 
     // local maxima (3x3), skipping the 1-px tile border to avoid seam artefacts
@@ -100,11 +102,29 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
   })
 }
 
+// Season fit: 1 in-season, tapering to 0.5 out of season (still fishable structure).
+export function seasonFit(species, timeMs) {
+  const months = species.seasonMonths || []
+  if (!months.length) return 1
+  const m = new Date(timeMs).getMonth() + 1
+  return months.includes(m) ? 1 : 0.5
+}
+
+// The live "bite score" for a spot at a moment: its structural score gated by how well
+// the tide (and season) suit this species right now. This is what the pin/card show, so
+// scrubbing the time slider changes the numbers — and chinook vs lingcod differ because
+// their tide preferences differ even on the same piece of structure.
+export function liveScore(baseScore, species, tide, timeMs) {
+  const tideMult = tide ? (0.35 + 0.65 * tideFitAt(tide, species, timeMs)) : 1
+  return baseScore * tideMult * seasonFit(species, timeMs)
+}
+
 // A plain-language tide hint from the species' best phases (until timed windows load).
 export function tideHint(species) {
+  // no leading article — the rationale templates already read "…on the {tide}"
   const map = {
-    change: 'the tide change', slack: 'slack', flood: 'the flood',
-    ebb: 'the ebb', maxFlow: 'max flow', 'tide-change': 'the tide change',
+    change: 'tide change', slack: 'slack', flood: 'flood',
+    ebb: 'ebb', maxFlow: 'max flow', 'tide-change': 'tide change',
   }
   const phases = (species.tidePhase?.bestPhases || []).map((p) => map[p] || p)
   if (!phases.length) return 'moving water'
@@ -170,7 +190,7 @@ export function buildHeat(manifest, tiles, species) {
       const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
       const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
         sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
-      const [r, gg, b, a] = heatColor((0.4 + 0.6 * g) * terr)
+      const [r, gg, b, a] = heatColor((0.2 + 0.8 * g) * terr)
       if (a <= 1) continue
       const o = i * 4
       img.data[o] = r; img.data[o + 1] = gg; img.data[o + 2] = b; img.data[o + 3] = a

@@ -1,10 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="96" fill="#0b1622"/>
-  <!-- depth bands -->
-  <path d="M0 300 Q128 260 256 300 T512 300 V512 H0 Z" fill="#12314a"/>
-  <path d="M0 360 Q128 330 256 360 T512 360 V512 H0 Z" fill="#1b4c72"/>
-  <path d="M0 420 Q128 396 256 420 T512 420 V512 H0 Z" fill="#2f7bb0"/>
-  <!-- pinnacle / structure marker -->
-  <path d="M256 120 L316 300 H196 Z" fill="#8fd0ff"/>
-  <circle cx="256" cy="300" r="20" fill="#ffcf6b"/>
+  <defs>
+    <clipPath id="r"><rect width="512" height="512" rx="112"/></clipPath>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1a24"/>
+      <stop offset="1" stop-color="#123240"/>
+    </linearGradient>
+    <linearGradient id="land" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c6f5e"/>
+      <stop offset="1" stop-color="#17403a"/>
+    </linearGradient>
+    <linearGradient id="landBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f8a72"/>
+      <stop offset="1" stop-color="#245c50"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffe6a8"/>
+      <stop offset="1" stop-color="#ffcf6b"/>
+    </radialGradient>
+  </defs>
+
+  <g clip-path="url(#r)">
+    <!-- sky -->
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <!-- low sun over the horizon -->
+    <circle cx="360" cy="150" r="46" fill="url(#sun)" opacity="0.9"/>
+
+    <!-- distant range (land, back) -->
+    <path d="M0 214 L84 150 L150 196 L236 132 L322 190 L410 140 L512 200 V236 H0 Z" fill="url(#landBack)" opacity="0.85"/>
+    <!-- foreground headland (land, front) -->
+    <path d="M0 250 L96 176 L188 236 L276 168 L380 240 L512 190 V276 H0 Z" fill="url(#land)"/>
+
+    <!-- sea: stacked bathymetric bands, light shallows to deep -->
+    <rect x="0" y="272" width="512" height="240" fill="#0e2b40"/>
+    <path d="M0 300 Q128 280 256 300 T512 300 V512 H0 Z" fill="#164a6e"/>
+    <path d="M0 348 Q128 328 256 348 T512 348 V512 H0 Z" fill="#1f6da0"/>
+    <path d="M0 402 Q128 384 256 402 T512 402 V512 H0 Z" fill="#2f8fca"/>
+    <path d="M0 456 Q128 442 256 456 T512 456 V512 H0 Z" fill="#5ab6e6"/>
+
+    <!-- thin depth contour lines (the chart motif) -->
+    <path d="M0 324 Q128 306 256 324 T512 324" fill="none" stroke="#bfe6ff" stroke-width="3" opacity="0.35"/>
+    <path d="M0 378 Q128 362 256 378 T512 378" fill="none" stroke="#bfe6ff" stroke-width="3" opacity="0.3"/>
+
+    <!-- signature waypoint: ping ring + glowing pin over structure -->
+    <circle cx="256" cy="360" r="54" fill="none" stroke="#ffcf6b" stroke-width="6" opacity="0.35"/>
+    <circle cx="256" cy="360" r="34" fill="none" stroke="#ffcf6b" stroke-width="6" opacity="0.6"/>
+    <circle cx="256" cy="360" r="15" fill="#ffcf6b"/>
+    <circle cx="256" cy="360" r="6" fill="#0a1a24"/>
+  </g>
 </svg>

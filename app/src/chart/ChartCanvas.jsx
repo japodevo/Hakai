@@ -3,7 +3,7 @@ import { loadManifest, loadTile } from './tiles.js'
 import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import { SPECIES } from '../scoring/species.js'
-import { computeSpots, buildHeat } from '../scoring/score.js'
+import { computeSpots, buildHeat, liveScore } from '../scoring/score.js'
 import { loadTides, phaseNow, referenceNow, tideFitAt } from '../tides/tides.js'
 import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
@@ -41,7 +41,8 @@ export default function ChartCanvas() {
   const [status, setStatus] = useState('loading chart…')
   const [readout, setReadout] = useState(null)
   const [units, setUnits] = useState('m')
-  const [legendOpen, setLegendOpen] = useState(true)
+  // collapsed by default so it never crowds the species chips on a small phone
+  const [legendOpen, setLegendOpen] = useState(false)
   const [gpsState, setGpsState] = useState('off')  // off | acquiring | active
   const [speciesKey, setSpeciesKey] = useState(null)
   const [spots, setSpots] = useState([])
@@ -378,9 +379,11 @@ export default function ChartCanvas() {
         ctx.lineWidth = 2; ctx.strokeStyle = isZone ? '#fff' : '#06101a'
         if (isZone) ctx.setLineDash([3, 3])
         ctx.stroke(); ctx.setLineDash([])
-        // label = absolute structure score (0-99), not the rank
+        // label = live "bite now" score (structure gated by the tide at the slider time),
+        // so the number rises in a good window and drops at slack / off-tide.
+        const live = t ? liveScore(s.score, sp, t, effTimeRef.current) : s.score
         ctx.fillStyle = '#06101a'
-        ctx.fillText(String(Math.min(99, Math.round(s.score * 100))), px, py + 0.5)
+        ctx.fillText(String(Math.min(99, Math.round(live * 100))), px, py + 0.5)
         ctx.globalAlpha = 1
       }
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
@@ -630,7 +633,7 @@ export default function ChartCanvas() {
     : 'slack / off — pins dimmed'
 
   return (
-    <div className={`chart ${showTide ? 'tide-open' : ''}`} ref={wrapRef}>
+    <div className={`chart ${showTide ? 'tide-open' : ''} ${(showTide || showPlan || showLog || activeSpot) ? 'sheet-open' : ''}`} ref={wrapRef}>
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}

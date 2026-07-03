@@ -21,7 +21,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <div className="brand">Hakai Structure Finder</div>
+        <div className="brand">Hakai</div>
         <button className="guide-btn" onClick={() => setShowGuide(true)}>📖 Guide</button>
         <div className="notnav">⚠ NOT FOR NAVIGATION</div>
       </header>

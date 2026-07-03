@@ -14,7 +14,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Hakai Structure Finder',
+        name: 'Hakai',
         short_name: 'Hakai',
         description: 'Offline fishing structure finder — Hakai Passage. Not for navigation.',
         theme_color: '#0b1622',

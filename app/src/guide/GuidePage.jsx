@@ -128,10 +128,11 @@ export default function GuidePage({ onClose }) {
           <li><b>Tap a pin</b> → depth, structure, why it scored, the tactic, and the
             timed tide window. <b>Heat</b> shows the whole score field.</li>
           <li><b>🌊 Tides</b> → the day's curve. Use <b>‹ ›</b> to change day and drag the
-            <b> slider</b> to any time; it tells you which species the tide favours then, and
-            the map pins <b>brighten in a good tide window and dim at slack / off-tide</b>.
-            (Spot <i>locations</i> are fixed structure — the tide changes <i>when</i> to be
-            there, not where.)</li>
+            <b> slider</b> to any time. The number in each pin is a <b>“bite score now”</b> —
+            the spot's structure times how well the tide suits that species at that moment —
+            so it <b>rises in a good window and drops at slack / off-tide</b>, and the pins
+            brighten and dim with it. (Spot <i>locations</i> are fixed structure — the tide
+            changes <i>when</i> to be there, not where.)</li>
           <li><b>Tap open water</b> → depth readout. <b>m/ft</b> toggles units (feet for
             downriggers). On a spot card, flip <b>Gear</b> if you don't run downriggers.</li>
           <li><b>🎣 Catch log</b> → one tap saves species/length/lure with auto GPS, depth,

@@ -35,8 +35,8 @@ export const SPECIES = [
       "why": "Hakai Passage is a strong tidal funnel; moving tide stacks herring and needlefish against points and along current seams and drives upwelling, which switches the bite on. Best action is the tide-change window (~1 h either side of the turn) and the early build of a new tide; the bite dies at true dead slack, and on big spring tides peak max-flow runs the main pass too hard to fish directly (only small/moderate-range tides fish well at max flow). TIMING CAVEAT: in a high-current pass, slack CURRENT lags the high/low WATER turn by roughly 30-90 min (and max current is not exactly at mid-tide height). The pipeline only has IWLS water-level hi/lo events, no current velocity — so center the tide-change bite window on estimated current slack (apply a lag offset from the hi/lo tick, or widen the window) and surface a 'slack current lags high/low water' note rather than implying they coincide. Both the flood (carrying bait and fish IN from Queen Charlotte Sound) and the ebb (flushing bait out through the pass) produce; the trophy-Tyee window is most reliably the tide change overlapping dawn/dusk on either flow direction, not the ebb alone."
     },
     "scoring": {
-      "depthMeanM": 40,
-      "depthSigmaM": 21,
+      "depthMeanM": 32,
+      "depthSigmaM": 20,
       "weights": {
         "prominence": 0.45,
         "slope": 0.5,
@@ -252,8 +252,8 @@ export const SPECIES = [
       "why": "Lingcod are ambush predators keyed to current delivering prey. Slack lets you get a heavy jig straight down onto the peak; the feeding switch flips as water starts moving on the change; work the build-up and the fade. IMPORTANT scoring calibration: the heavy max-flow penalty is tuned to Hakai Passage's extreme rip and should be GATED ON MODELED LOCAL CURRENT SPEED, not applied flat across the AOI. On moderate-current rock (Fitz Hugh Sound, sheltered reefs and banks) mid-flood and mid-ebb ARE the prime bite, so flood/ebb should score well there; apply the strong max-flow down-weight only where modeled current exceeds a hold-bottom threshold. Plan drops around the tide change, especially a morning change coinciding with low light."
     },
     "scoring": {
-      "depthMeanM": 40,
-      "depthSigmaM": 20,
+      "depthMeanM": 50,
+      "depthSigmaM": 22,
       "weights": {
         "prominence": 0.95,
         "slope": 0.8,
