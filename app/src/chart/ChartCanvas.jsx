@@ -9,6 +9,7 @@ import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
 import { allCatches, putCatch, deleteCatch, newId } from '../catch/db.js'
 import CatchLog from '../catch/CatchLog.jsx'
+import PlanSheet from '../plan/PlanSheet.jsx'
 import './chart.css'
 
 // Chart renderer: pans/zooms the pre-rendered bathy tiles on a canvas and draws
@@ -47,6 +48,9 @@ export default function ChartCanvas() {
   const [showTide, setShowTide] = useState(false)
   const [catches, setCatches] = useState([])
   const [showLog, setShowLog] = useState(false)
+  const [showPlan, setShowPlan] = useState(false)
+  const [allSpots, setAllSpots] = useState({})
+  const [planBuilding, setPlanBuilding] = useState(false)
   const catchesRef = useRef([])
   const tideRef = useRef(null)
 
@@ -88,6 +92,42 @@ export default function ChartCanvas() {
     try { await deleteCatch(id); setCatches(await allCatches()) } catch (e) { console.warn('delete catch failed', e) }
   }
 
+  // Score every species (cached) so the game plan can fuse all of them.
+  function ensureAllSpots() {
+    const man = manifestRef.current
+    if (!man || !tilesLoadedRef.current) { setAllSpots({}); return }
+    setPlanBuilding(true)
+    setTimeout(() => {
+      const tilesArr = [...tilesRef.current.values()]
+      const out = {}
+      for (const s of SPECIES) {
+        if (!spotsCacheRef.current[s.key]) {
+          try { spotsCacheRef.current[s.key] = computeSpots(man, tilesArr, s) }
+          catch (e) { spotsCacheRef.current[s.key] = [] }
+        }
+        out[s.key] = spotsCacheRef.current[s.key]
+      }
+      setAllSpots(out); setPlanBuilding(false)
+    }, 30)
+  }
+  function openPlan() { setShowPlan(true); ensureAllSpots() }
+  function centerOn(lat, lon) {
+    const man = manifestRef.current, wrap = wrapRef.current
+    if (!man || !wrap || lat == null) return
+    const [E, N] = lonLatToUtm(lon, lat, epsgRef.current)
+    const v = viewRef.current
+    v.scale = clampScale(Math.max(v.scale, 2.5))
+    v.tx = wrap.clientWidth / 2 - ((E - man.origin[0]) / man.res[0]) * v.scale
+    v.ty = wrap.clientHeight / 2 - ((man.origin[1] - N) / man.res[1]) * v.scale
+    scheduleDraw()
+  }
+  function pickFromPlan(species, spot) {
+    setSpeciesKey(species.key)   // cached scoring -> pins; effect no longer clears activeSpot
+    setShowPlan(false)
+    setActiveSpot(spot)
+    centerOn(spot.lat, spot.lon)
+  }
+
   useEffect(() => {
     posRef.current = pos
     if (pos) setGpsState('active')
@@ -98,7 +138,6 @@ export default function ChartCanvas() {
   useEffect(() => { activeSpotRef.current = activeSpot; scheduleDraw() }, [activeSpot])
   useEffect(() => {
     speciesKeyRef.current = speciesKey
-    setActiveSpot(null)
     runScoring(speciesKey)
   }, [speciesKey])
 
@@ -444,7 +483,7 @@ export default function ChartCanvas() {
           <button key={s.key}
             className={`chip ${speciesKey === s.key ? 'active' : ''}`}
             style={speciesKey === s.key ? { borderColor: s.color, color: '#fff' } : undefined}
-            onClick={() => setSpeciesKey(speciesKey === s.key ? null : s.key)}>
+            onClick={() => { setActiveSpot(null); setSpeciesKey(speciesKey === s.key ? null : s.key) }}>
             <span className="dot" style={{ background: s.color }} />{s.label}
           </button>
         ))}
@@ -472,6 +511,8 @@ export default function ChartCanvas() {
       </div>
 
       <div className="chart-controls">
+        <button className={`plan-btn ${showPlan ? 'primary' : ''}`} onClick={openPlan}
+          title="Game plan">Plan</button>
         <button className={showLog ? 'primary' : ''} onClick={() => setShowLog((v) => !v)}
           title="Catch log">🎣</button>
         <button className={showTide ? 'primary' : ''} onClick={() => setShowTide((v) => !v)}
@@ -516,6 +557,12 @@ export default function ChartCanvas() {
           defaultSpecies={(SPECIES.find((s) => s.key === speciesKey) || {}).label}
           getCapture={getCapture} onSave={saveCatch} onDelete={removeCatch}
           units={units} onClose={() => setShowLog(false)} />
+      )}
+
+      {showPlan && (
+        <PlanSheet allSpots={allSpots} tide={tide} speciesList={SPECIES}
+          units={units} building={planBuilding}
+          onPick={pickFromPlan} onClose={() => setShowPlan(false)} />
       )}
     </div>
   )
