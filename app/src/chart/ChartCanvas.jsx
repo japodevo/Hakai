@@ -4,7 +4,7 @@ import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import { SPECIES } from '../scoring/species.js'
 import { computeSpots, buildHeat } from '../scoring/score.js'
-import { loadTides, phaseNow } from '../tides/tides.js'
+import { loadTides, phaseNow, referenceNow } from '../tides/tides.js'
 import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
 import { allCatches, putCatch, deleteCatch, newId } from '../catch/db.js'
@@ -49,6 +49,7 @@ export default function ChartCanvas() {
   const [activeSpot, setActiveSpot] = useState(null)
   const [tide, setTide] = useState(null)
   const [showTide, setShowTide] = useState(false)
+  const [refTime, setRefTime] = useState(null)   // time-of-day slider (null = real now)
   const [noRigger, setNoRigger] = useState(() => {
     try { return localStorage.getItem('hakai.noRigger') === '1' } catch { return false }
   })
@@ -556,6 +557,8 @@ export default function ChartCanvas() {
     scheduleDraw()
   }
 
+  const effRef = refTime != null ? refTime : (tide ? referenceNow(tide) : Date.now())
+
   return (
     <div className={`chart ${showTide ? 'tide-open' : ''}`} ref={wrapRef}>
       <canvas
@@ -647,12 +650,14 @@ export default function ChartCanvas() {
 
       {showTide && (
         <TideStrip tide={tide} species={SPECIES.find((s) => s.key === speciesKey) || null}
+          speciesList={SPECIES} refTime={effRef} onRefTime={setRefTime}
+          onPickSpecies={(k) => { setActiveSpot(null); setSpeciesKey(k) }}
           onClose={() => setShowTide(false)} />
       )}
 
       {activeSpot && speciesRef.current && (
         <SpotCard spot={activeSpot} species={speciesRef.current} units={units} tide={tide}
-          noRigger={noRigger} onToggleRigger={toggleRigger}
+          now={effRef} noRigger={noRigger} onToggleRigger={toggleRigger}
           onClose={() => setActiveSpot(null)} />
       )}
 
@@ -665,7 +670,7 @@ export default function ChartCanvas() {
 
       {showPlan && (
         <PlanSheet allSpots={allSpots} tide={tide} speciesList={SPECIES}
-          units={units} building={planBuilding}
+          units={units} building={planBuilding} now={effRef}
           onPick={pickFromPlan} onClose={() => setShowPlan(false)} />
       )}
     </div>

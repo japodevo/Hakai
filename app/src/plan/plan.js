@@ -10,7 +10,7 @@ function inSeason(species, monthIdx) {
 // spotsBySpecies: { chinook: [...spots], coho: [...], lingcod: [...] }
 // Returns { day, windows: [{start,end,label,phase,center,picks:[{species,spot,score}]}], noTide, spotsOnly }
 export function buildPlan(spotsBySpecies, tide, speciesList, opts = {}) {
-  const ref = tide ? referenceNow(tide) : Date.now()
+  const ref = opts.now != null ? opts.now : (tide ? referenceNow(tide) : Date.now())
   const month = new Date(ref).getMonth() + 1
 
   // No tide data → fall back to a ranked spot list per in-season species.

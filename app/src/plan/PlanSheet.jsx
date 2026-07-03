@@ -4,9 +4,9 @@ import { fmtDepth } from '../chart/proj.js'
 
 // The unified "game plan": time-ordered tide windows, each matched to the species it
 // favours and that species' best spot (depth + structure). Tap a pick to jump to it.
-export default function PlanSheet({ allSpots, tide, speciesList, units, building, onPick, onClose }) {
-  const plan = buildPlan(allSpots, tide, speciesList)
-  const now = Date.now()
+export default function PlanSheet({ allSpots, tide, speciesList, units, building, now: refNow, onPick, onClose }) {
+  const now = refNow || Date.now()
+  const plan = buildPlan(allSpots, tide, speciesList, { now })
 
   const pickRow = (p, w, cls) => (
     <button className={`plan-pick ${cls || ''}`} onClick={() => onPick(p.species, p.spot)}>

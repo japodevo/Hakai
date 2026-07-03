@@ -13,9 +13,9 @@ function Bar({ label, v }) {
 
 // Bottom-sheet card for a ranked spot: depth, timed tide window, rationale, tactic,
 // an in/out-of-season badge, and the regs + not-for-nav caveats.
-export default function SpotCard({ spot, species, units, tide, noRigger, onToggleRigger, onClose }) {
+export default function SpotCard({ spot, species, units, tide, now, noRigger, onToggleRigger, onClose }) {
   const depthStr = fmtDepth(spot.depthM, units)
-  const month = new Date().getMonth() + 1
+  const month = new Date(now || Date.now()).getMonth() + 1
   const inSeason = (species.seasonMonths || []).includes(month)
 
   // Downrigger-free tactic: prefer a mooch/jig/drift/cast method; if only a
@@ -27,7 +27,7 @@ export default function SpotCard({ spot, species, units, tide, noRigger, onToggl
     ? `No downrigger: reach ${depthStr} with a 4–16 oz trolling weight or a diving planer (Deep Six / Dipsy Diver), or motor-mooch a cut-plug herring down to it.`
     : null
 
-  const nw = tide ? nextWindow(tide, species, Date.now()) : null
+  const nw = tide ? nextWindow(tide, species, now || Date.now()) : null
   const whenValue = nw
     ? `${nw.label.split(' — ')[0]} · ${fmtTime(nw.start)}–${fmtTime(nw.end)}${nw.current ? ' (now)' : ''}`
     : tideHint(species)
