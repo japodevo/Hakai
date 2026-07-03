@@ -1,13 +1,19 @@
 import { fmtDepth } from './proj.js'
 import { rationale, tideHint } from '../scoring/score.js'
+import { nextWindow, fmtTime } from '../tides/tides.js'
 
-// Bottom-sheet card for a ranked spot: depth, tide phase, rationale, tactic,
+// Bottom-sheet card for a ranked spot: depth, timed tide window, rationale, tactic,
 // an in/out-of-season badge, and the regs + not-for-nav caveats.
-export default function SpotCard({ spot, species, units, onClose }) {
+export default function SpotCard({ spot, species, units, tide, onClose }) {
   const depthStr = fmtDepth(spot.depthM, units)
   const tactic = species.tactics && species.tactics[0]
   const month = new Date().getMonth() + 1
   const inSeason = (species.seasonMonths || []).includes(month)
+
+  const nw = tide ? nextWindow(tide, species, Date.now()) : null
+  const whenValue = nw
+    ? `${nw.label.split(' — ')[0]} · ${fmtTime(nw.start)}–${fmtTime(nw.end)}${nw.current ? ' (now)' : ''}`
+    : tideHint(species)
 
   return (
     <div className="spot-card">
@@ -25,7 +31,7 @@ export default function SpotCard({ spot, species, units, onClose }) {
 
       <div className="spot-grid">
         <div><span className="k">Depth</span><b>{depthStr}</b></div>
-        <div><span className="k">Fish it on</span><b>{tideHint(species)}</b></div>
+        <div><span className="k">{nw ? 'Best window' : 'Fish it on'}</span><b>{whenValue}</b></div>
       </div>
 
       <div className="spot-why">{rationale(species, spot, depthStr)}</div>

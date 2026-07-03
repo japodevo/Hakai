@@ -4,6 +4,8 @@ import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import { SPECIES } from '../scoring/species.js'
 import { computeSpots } from '../scoring/score.js'
+import { loadTides } from '../tides/tides.js'
+import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
 import './chart.css'
 
@@ -39,6 +41,10 @@ export default function ChartCanvas() {
   const [spots, setSpots] = useState([])
   const [scoring, setScoring] = useState(false)
   const [activeSpot, setActiveSpot] = useState(null)
+  const [tide, setTide] = useState(null)
+  const [showTide, setShowTide] = useState(false)
+
+  useEffect(() => { loadTides().then(setTide) }, [])
 
   useEffect(() => {
     posRef.current = pos
@@ -363,7 +369,7 @@ export default function ChartCanvas() {
   }
 
   return (
-    <div className="chart" ref={wrapRef}>
+    <div className={`chart ${showTide ? 'tide-open' : ''}`} ref={wrapRef}>
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
@@ -408,6 +414,8 @@ export default function ChartCanvas() {
       </div>
 
       <div className="chart-controls">
+        <button className={showTide ? 'primary' : ''} onClick={() => setShowTide((v) => !v)}
+          title="Tides">🌊</button>
         <button onClick={() => setUnits((u) => (u === 'm' ? 'ft' : 'm'))}
           title="Depth units">{units}</button>
         <button onClick={() => zoomCenter(1.6)} title="Zoom in">+</button>
@@ -433,8 +441,13 @@ export default function ChartCanvas() {
 
       {gpsError && <div className="chart-gps-err">GPS: {gpsError}</div>}
 
+      {showTide && (
+        <TideStrip tide={tide} species={SPECIES.find((s) => s.key === speciesKey) || null}
+          onClose={() => setShowTide(false)} />
+      )}
+
       {activeSpot && speciesRef.current && (
-        <SpotCard spot={activeSpot} species={speciesRef.current} units={units}
+        <SpotCard spot={activeSpot} species={speciesRef.current} units={units} tide={tide}
           onClose={() => setActiveSpot(null)} />
       )}
     </div>
