@@ -1,0 +1,106 @@
+# Refresh tides in the cloud and redeploy the app to GitHub Pages — no Mac needed.
+#
+# Safety model (deliberately conservative — must never break the live app):
+#   * Bathymetry is NOT re-fetched here. The published gh-pages branch already
+#     carries the real NONNA tiles (static data); this workflow reuses them.
+#     Re-running the bathy pipeline stays a manual, on-Mac job.
+#   * Tides are re-fetched for a rolling window (today → +45 days) from DFO IWLS.
+#   * Hard sanity gates before deploy: if the tide fetch, tile recovery, or app
+#     build produces anything incomplete, the job FAILS and nothing is pushed —
+#     the currently-published site stays live and untouched.
+#   * Deploys to the same gh-pages branch the manual `npm run deploy` uses, so
+#     the Pages serving mechanism (and the Mac fallback) are unchanged.
+#
+# Triggers: manual button (Actions → this workflow → Run workflow) and a weekly
+# cron so the bundled tide window never goes stale before a trip.
+name: Refresh tides & deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      days_ahead:
+        description: "How many days of tides to prefetch"
+        default: "45"
+        required: false
+  schedule:
+    - cron: "17 14 * * 1" # Mondays 14:17 UTC (~07:17 Pacific)
+
+permissions:
+  contents: write # push the built site to the gh-pages branch
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Recover the published data (tiles, manifest, coastline, places) from the
+      # live gh-pages branch — tile binaries are gitignored in source by design.
+      - name: Recover published tiles from gh-pages
+        run: |
+          git fetch origin gh-pages --depth=1
+          git checkout origin/gh-pages -- data
+          count=$(ls data/tiles/*.bin.gz 2>/dev/null | wc -l)
+          echo "recovered $count tile binaries"
+          test "$count" -ge 1
+          test -s data/tiles/manifest.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Refresh tides from DFO IWLS (rolling window)
+        run: |
+          pip install --quiet requests
+          DAYS="${{ github.event.inputs.days_ahead || '45' }}"
+          FROM=$(date -u +%F)
+          TO=$(date -u -d "+${DAYS} days" +%F)
+          echo "fetching tides $FROM → $TO"
+          python pipeline/fetch_tides.py --from "$FROM" --to "$TO"
+
+      - name: Sanity-check tides
+        run: |
+          python - <<'EOF'
+          import json, sys
+          j = json.load(open("data/tides.json"))
+          preds, hilo = j.get("predictions") or [], j.get("hilo") or []
+          print(f"station={j.get('station',{}).get('name')} preds={len(preds)} hilo={len(hilo)}")
+          # 45 days at 15-min resolution ≈ 4300 samples; require a sane minimum
+          assert len(preds) > 1000, "too few tide predictions — aborting deploy"
+          assert len(hilo) > 20, "too few hi/lo events — aborting deploy"
+          EOF
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build app
+        working-directory: app
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Sanity-check build output
+        run: |
+          test -s app/dist/index.html
+          test -s app/dist/data/tides.json
+          test -s app/dist/data/tiles/manifest.json
+          count=$(ls app/dist/data/tiles/*.bin.gz 2>/dev/null | wc -l)
+          echo "dist has $count tile binaries"
+          test "$count" -ge 1
+          test -s app/dist/sw.js
+
+      # Same publish mechanism as the manual `npm run deploy` (a commit on the
+      # gh-pages branch) — Pages settings stay untouched.
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./app/dist
+          publish_branch: gh-pages
+          commit_message: "Auto-refresh tides & redeploy (${{ github.run_number }})"
