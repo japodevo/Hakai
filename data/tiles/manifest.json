@@ -1,0 +1,838 @@
+{
+  "layer": "bathy",
+  "crs": "EPSG:32609",
+  "res": [
+    10.0,
+    10.0
+  ],
+  "tileSize": 512,
+  "grid": {
+    "cols": 7,
+    "rows": 7
+  },
+  "full": {
+    "width": 3497,
+    "height": 3380
+  },
+  "origin": [
+    544770.0,
+    5744990.0
+  ],
+  "extent": {
+    "xmin": 544770.0,
+    "ymax": 5744990.0,
+    "xmax": 579740.0,
+    "ymin": 5711190.0
+  },
+  "depth": {
+    "scale": 10,
+    "unit": "decimetre",
+    "nodata": -32768,
+    "dtype": "int16-le"
+  },
+  "aoiWgs84": {
+    "latMin": 51.55,
+    "latMax": 51.85,
+    "lonMin": -128.35,
+    "lonMax": -127.85
+  },
+  "tiles": [
+    {
+      "id": "bathy_0_0",
+      "col": 0,
+      "row": 0,
+      "w": 512,
+      "h": 512,
+      "x": 544770.0,
+      "y": 5744990.0,
+      "surveyed": 242185,
+      "coverage": 0.9239,
+      "bin": "bathy_0_0.bin.gz",
+      "src": "bathy_0_0.src.gz",
+      "srcCounts": {
+        "1": 239864,
+        "2": 2321
+      }
+    },
+    {
+      "id": "bathy_1_0",
+      "col": 1,
+      "row": 0,
+      "w": 512,
+      "h": 512,
+      "x": 549890.0,
+      "y": 5744990.0,
+      "surveyed": 168607,
+      "coverage": 0.6432,
+      "bin": "bathy_1_0.bin.gz",
+      "src": "bathy_1_0.src.gz",
+      "srcCounts": {
+        "1": 48556,
+        "2": 120051
+      }
+    },
+    {
+      "id": "bathy_2_0",
+      "col": 2,
+      "row": 0,
+      "w": 512,
+      "h": 512,
+      "x": 555010.0,
+      "y": 5744990.0,
+      "surveyed": 189244,
+      "coverage": 0.7219,
+      "bin": "bathy_2_0.bin.gz",
+      "src": "bathy_2_0.src.gz",
+      "srcCounts": {
+        "1": 110517,
+        "2": 78727
+      }
+    },
+    {
+      "id": "bathy_3_0",
+      "col": 3,
+      "row": 0,
+      "w": 512,
+      "h": 512,
+      "x": 560130.0,
+      "y": 5744990.0,
+      "surveyed": 36500,
+      "coverage": 0.1392,
+      "bin": "bathy_3_0.bin.gz",
+      "src": "bathy_3_0.src.gz",
+      "srcCounts": {
+        "1": 838,
+        "2": 35662
+      }
+    },
+    {
+      "id": "bathy_4_0",
+      "col": 4,
+      "row": 0,
+      "w": 512,
+      "h": 512,
+      "x": 565250.0,
+      "y": 5744990.0,
+      "surveyed": 176184,
+      "coverage": 0.6721,
+      "bin": "bathy_4_0.bin.gz",
+      "src": "bathy_4_0.src.gz",
+      "srcCounts": {
+        "1": 134269,
+        "2": 41915
+      }
+    },
+    {
+      "id": "bathy_5_0",
+      "col": 5,
+      "row": 0,
+      "w": 512,
+      "h": 512,
+      "x": 570370.0,
+      "y": 5744990.0,
+      "surveyed": 258229,
+      "coverage": 0.9851,
+      "bin": "bathy_5_0.bin.gz",
+      "src": "bathy_5_0.src.gz",
+      "srcCounts": {
+        "1": 256859,
+        "2": 1370
+      }
+    },
+    {
+      "id": "bathy_6_0",
+      "col": 6,
+      "row": 0,
+      "w": 425,
+      "h": 512,
+      "x": 575490.0,
+      "y": 5744990.0,
+      "surveyed": 44758,
+      "coverage": 0.2057,
+      "bin": "bathy_6_0.bin.gz",
+      "src": "bathy_6_0.src.gz",
+      "srcCounts": {
+        "1": 25782,
+        "2": 18976
+      }
+    },
+    {
+      "id": "bathy_0_1",
+      "col": 0,
+      "row": 1,
+      "w": 512,
+      "h": 512,
+      "x": 544770.0,
+      "y": 5739870.0,
+      "surveyed": 260138,
+      "coverage": 0.9923,
+      "bin": "bathy_0_1.bin.gz",
+      "src": "bathy_0_1.src.gz",
+      "srcCounts": {
+        "1": 258946,
+        "2": 1192
+      }
+    },
+    {
+      "id": "bathy_1_1",
+      "col": 1,
+      "row": 1,
+      "w": 512,
+      "h": 512,
+      "x": 549890.0,
+      "y": 5739870.0,
+      "surveyed": 240498,
+      "coverage": 0.9174,
+      "bin": "bathy_1_1.bin.gz",
+      "src": "bathy_1_1.src.gz",
+      "srcCounts": {
+        "1": 168065,
+        "2": 72433
+      }
+    },
+    {
+      "id": "bathy_2_1",
+      "col": 2,
+      "row": 1,
+      "w": 512,
+      "h": 512,
+      "x": 555010.0,
+      "y": 5739870.0,
+      "surveyed": 255186,
+      "coverage": 0.9735,
+      "bin": "bathy_2_1.bin.gz",
+      "src": "bathy_2_1.src.gz",
+      "srcCounts": {
+        "1": 212365,
+        "2": 42821
+      }
+    },
+    {
+      "id": "bathy_3_1",
+      "col": 3,
+      "row": 1,
+      "w": 512,
+      "h": 512,
+      "x": 560130.0,
+      "y": 5739870.0,
+      "surveyed": 109837,
+      "coverage": 0.419,
+      "bin": "bathy_3_1.bin.gz",
+      "src": "bathy_3_1.src.gz",
+      "srcCounts": {
+        "1": 56760,
+        "2": 53077
+      }
+    },
+    {
+      "id": "bathy_4_1",
+      "col": 4,
+      "row": 1,
+      "w": 512,
+      "h": 512,
+      "x": 565250.0,
+      "y": 5739870.0,
+      "surveyed": 152562,
+      "coverage": 0.582,
+      "bin": "bathy_4_1.bin.gz",
+      "src": "bathy_4_1.src.gz",
+      "srcCounts": {
+        "1": 127844,
+        "2": 24718
+      }
+    },
+    {
+      "id": "bathy_5_1",
+      "col": 5,
+      "row": 1,
+      "w": 512,
+      "h": 512,
+      "x": 570370.0,
+      "y": 5739870.0,
+      "surveyed": 262144,
+      "coverage": 1.0,
+      "bin": "bathy_5_1.bin.gz",
+      "src": "bathy_5_1.src.gz",
+      "srcCounts": {
+        "1": 262127,
+        "2": 17
+      }
+    },
+    {
+      "id": "bathy_6_1",
+      "col": 6,
+      "row": 1,
+      "w": 425,
+      "h": 512,
+      "x": 575490.0,
+      "y": 5739870.0,
+      "surveyed": 76379,
+      "coverage": 0.351,
+      "bin": "bathy_6_1.bin.gz",
+      "src": "bathy_6_1.src.gz",
+      "srcCounts": {
+        "1": 67251,
+        "2": 9128
+      }
+    },
+    {
+      "id": "bathy_0_2",
+      "col": 0,
+      "row": 2,
+      "w": 512,
+      "h": 512,
+      "x": 544770.0,
+      "y": 5734750.0,
+      "surveyed": 257812,
+      "coverage": 0.9835,
+      "bin": "bathy_0_2.bin.gz",
+      "src": "bathy_0_2.src.gz",
+      "srcCounts": {
+        "1": 256588,
+        "2": 1224
+      }
+    },
+    {
+      "id": "bathy_1_2",
+      "col": 1,
+      "row": 2,
+      "w": 512,
+      "h": 512,
+      "x": 549890.0,
+      "y": 5734750.0,
+      "surveyed": 261786,
+      "coverage": 0.9986,
+      "bin": "bathy_1_2.bin.gz",
+      "src": "bathy_1_2.src.gz",
+      "srcCounts": {
+        "1": 253295,
+        "2": 8491
+      }
+    },
+    {
+      "id": "bathy_2_2",
+      "col": 2,
+      "row": 2,
+      "w": 512,
+      "h": 512,
+      "x": 555010.0,
+      "y": 5734750.0,
+      "surveyed": 252815,
+      "coverage": 0.9644,
+      "bin": "bathy_2_2.bin.gz",
+      "src": "bathy_2_2.src.gz",
+      "srcCounts": {
+        "1": 187034,
+        "2": 65781
+      }
+    },
+    {
+      "id": "bathy_3_2",
+      "col": 3,
+      "row": 2,
+      "w": 512,
+      "h": 512,
+      "x": 560130.0,
+      "y": 5734750.0,
+      "surveyed": 202439,
+      "coverage": 0.7722,
+      "bin": "bathy_3_2.bin.gz",
+      "src": "bathy_3_2.src.gz",
+      "srcCounts": {
+        "1": 161866,
+        "2": 40573
+      }
+    },
+    {
+      "id": "bathy_4_2",
+      "col": 4,
+      "row": 2,
+      "w": 512,
+      "h": 512,
+      "x": 565250.0,
+      "y": 5734750.0,
+      "surveyed": 183687,
+      "coverage": 0.7007,
+      "bin": "bathy_4_2.bin.gz",
+      "src": "bathy_4_2.src.gz",
+      "srcCounts": {
+        "1": 154925,
+        "2": 28762
+      }
+    },
+    {
+      "id": "bathy_5_2",
+      "col": 5,
+      "row": 2,
+      "w": 512,
+      "h": 512,
+      "x": 570370.0,
+      "y": 5734750.0,
+      "surveyed": 262144,
+      "coverage": 1.0,
+      "bin": "bathy_5_2.bin.gz",
+      "src": "bathy_5_2.src.gz",
+      "srcCounts": {
+        "1": 262139,
+        "2": 5
+      }
+    },
+    {
+      "id": "bathy_6_2",
+      "col": 6,
+      "row": 2,
+      "w": 425,
+      "h": 512,
+      "x": 575490.0,
+      "y": 5734750.0,
+      "surveyed": 83199,
+      "coverage": 0.3823,
+      "bin": "bathy_6_2.bin.gz",
+      "src": "bathy_6_2.src.gz",
+      "srcCounts": {
+        "1": 72253,
+        "2": 10946
+      }
+    },
+    {
+      "id": "bathy_0_3",
+      "col": 0,
+      "row": 3,
+      "w": 512,
+      "h": 512,
+      "x": 544770.0,
+      "y": 5729630.0,
+      "surveyed": 255478,
+      "coverage": 0.9746,
+      "bin": "bathy_0_3.bin.gz",
+      "src": "bathy_0_3.src.gz",
+      "srcCounts": {
+        "1": 253689,
+        "2": 1789
+      }
+    },
+    {
+      "id": "bathy_1_3",
+      "col": 1,
+      "row": 3,
+      "w": 512,
+      "h": 512,
+      "x": 549890.0,
+      "y": 5729630.0,
+      "surveyed": 262144,
+      "coverage": 1.0,
+      "bin": "bathy_1_3.bin.gz",
+      "src": "bathy_1_3.src.gz",
+      "srcCounts": {
+        "1": 261532,
+        "2": 612
+      }
+    },
+    {
+      "id": "bathy_2_3",
+      "col": 2,
+      "row": 3,
+      "w": 512,
+      "h": 512,
+      "x": 555010.0,
+      "y": 5729630.0,
+      "surveyed": 261675,
+      "coverage": 0.9982,
+      "bin": "bathy_2_3.bin.gz",
+      "src": "bathy_2_3.src.gz",
+      "srcCounts": {
+        "1": 258757,
+        "2": 2918
+      }
+    },
+    {
+      "id": "bathy_3_3",
+      "col": 3,
+      "row": 3,
+      "w": 512,
+      "h": 512,
+      "x": 560130.0,
+      "y": 5729630.0,
+      "surveyed": 164033,
+      "coverage": 0.6257,
+      "bin": "bathy_3_3.bin.gz",
+      "src": "bathy_3_3.src.gz",
+      "srcCounts": {
+        "1": 113768,
+        "2": 50265
+      }
+    },
+    {
+      "id": "bathy_4_3",
+      "col": 4,
+      "row": 3,
+      "w": 512,
+      "h": 512,
+      "x": 565250.0,
+      "y": 5729630.0,
+      "surveyed": 12052,
+      "coverage": 0.046,
+      "bin": "bathy_4_3.bin.gz",
+      "src": "bathy_4_3.src.gz",
+      "srcCounts": {
+        "1": 5712,
+        "2": 6340
+      }
+    },
+    {
+      "id": "bathy_5_3",
+      "col": 5,
+      "row": 3,
+      "w": 512,
+      "h": 512,
+      "x": 570370.0,
+      "y": 5729630.0,
+      "surveyed": 243288,
+      "coverage": 0.9281,
+      "bin": "bathy_5_3.bin.gz",
+      "src": "bathy_5_3.src.gz",
+      "srcCounts": {
+        "1": 240978,
+        "2": 2310
+      }
+    },
+    {
+      "id": "bathy_6_3",
+      "col": 6,
+      "row": 3,
+      "w": 425,
+      "h": 512,
+      "x": 575490.0,
+      "y": 5729630.0,
+      "surveyed": 86292,
+      "coverage": 0.3966,
+      "bin": "bathy_6_3.bin.gz",
+      "src": "bathy_6_3.src.gz",
+      "srcCounts": {
+        "1": 57196,
+        "2": 29096
+      }
+    },
+    {
+      "id": "bathy_0_4",
+      "col": 0,
+      "row": 4,
+      "w": 512,
+      "h": 512,
+      "x": 544770.0,
+      "y": 5724510.0,
+      "surveyed": 253141,
+      "coverage": 0.9657,
+      "bin": "bathy_0_4.bin.gz",
+      "src": "bathy_0_4.src.gz",
+      "srcCounts": {
+        "1": 251928,
+        "2": 1213
+      }
+    },
+    {
+      "id": "bathy_1_4",
+      "col": 1,
+      "row": 4,
+      "w": 512,
+      "h": 512,
+      "x": 549890.0,
+      "y": 5724510.0,
+      "surveyed": 262144,
+      "coverage": 1.0,
+      "bin": "bathy_1_4.bin.gz",
+      "src": "bathy_1_4.src.gz",
+      "srcCounts": {
+        "1": 262078,
+        "2": 66
+      }
+    },
+    {
+      "id": "bathy_2_4",
+      "col": 2,
+      "row": 4,
+      "w": 512,
+      "h": 512,
+      "x": 555010.0,
+      "y": 5724510.0,
+      "surveyed": 200789,
+      "coverage": 0.7659,
+      "bin": "bathy_2_4.bin.gz",
+      "src": "bathy_2_4.src.gz",
+      "srcCounts": {
+        "1": 168384,
+        "2": 32405
+      }
+    },
+    {
+      "id": "bathy_3_4",
+      "col": 3,
+      "row": 4,
+      "w": 512,
+      "h": 512,
+      "x": 560130.0,
+      "y": 5724510.0,
+      "surveyed": 57537,
+      "coverage": 0.2195,
+      "bin": "bathy_3_4.bin.gz",
+      "src": "bathy_3_4.src.gz",
+      "srcCounts": {
+        "1": 33004,
+        "2": 24533
+      }
+    },
+    {
+      "id": "bathy_4_4",
+      "col": 4,
+      "row": 4,
+      "w": 512,
+      "h": 512,
+      "x": 565250.0,
+      "y": 5724510.0,
+      "surveyed": 43264,
+      "coverage": 0.165,
+      "bin": "bathy_4_4.bin.gz",
+      "src": "bathy_4_4.src.gz",
+      "srcCounts": {
+        "1": 33745,
+        "2": 9519
+      }
+    },
+    {
+      "id": "bathy_5_4",
+      "col": 5,
+      "row": 4,
+      "w": 512,
+      "h": 512,
+      "x": 570370.0,
+      "y": 5724510.0,
+      "surveyed": 163649,
+      "coverage": 0.6243,
+      "bin": "bathy_5_4.bin.gz",
+      "src": "bathy_5_4.src.gz",
+      "srcCounts": {
+        "1": 153258,
+        "2": 10391
+      }
+    },
+    {
+      "id": "bathy_6_4",
+      "col": 6,
+      "row": 4,
+      "w": 425,
+      "h": 512,
+      "x": 575490.0,
+      "y": 5724510.0,
+      "surveyed": 186619,
+      "coverage": 0.8576,
+      "bin": "bathy_6_4.bin.gz",
+      "src": "bathy_6_4.src.gz",
+      "srcCounts": {
+        "1": 167850,
+        "2": 18769
+      }
+    },
+    {
+      "id": "bathy_0_5",
+      "col": 0,
+      "row": 5,
+      "w": 512,
+      "h": 512,
+      "x": 544770.0,
+      "y": 5719390.0,
+      "surveyed": 250823,
+      "coverage": 0.9568,
+      "bin": "bathy_0_5.bin.gz",
+      "src": "bathy_0_5.src.gz",
+      "srcCounts": {
+        "1": 249015,
+        "2": 1808
+      }
+    },
+    {
+      "id": "bathy_1_5",
+      "col": 1,
+      "row": 5,
+      "w": 512,
+      "h": 512,
+      "x": 549890.0,
+      "y": 5719390.0,
+      "surveyed": 262144,
+      "coverage": 1.0,
+      "bin": "bathy_1_5.bin.gz",
+      "src": "bathy_1_5.src.gz",
+      "srcCounts": {
+        "1": 261542,
+        "2": 602
+      }
+    },
+    {
+      "id": "bathy_2_5",
+      "col": 2,
+      "row": 5,
+      "w": 512,
+      "h": 512,
+      "x": 555010.0,
+      "y": 5719390.0,
+      "surveyed": 220087,
+      "coverage": 0.8396,
+      "bin": "bathy_2_5.bin.gz",
+      "src": "bathy_2_5.src.gz",
+      "srcCounts": {
+        "1": 194919,
+        "2": 25168
+      }
+    },
+    {
+      "id": "bathy_3_5",
+      "col": 3,
+      "row": 5,
+      "w": 512,
+      "h": 512,
+      "x": 560130.0,
+      "y": 5719390.0,
+      "surveyed": 3796,
+      "coverage": 0.0145,
+      "bin": "bathy_3_5.bin.gz",
+      "src": "bathy_3_5.src.gz",
+      "srcCounts": {
+        "1": 61,
+        "2": 3735
+      }
+    },
+    {
+      "id": "bathy_5_5",
+      "col": 5,
+      "row": 5,
+      "w": 512,
+      "h": 512,
+      "x": 570370.0,
+      "y": 5719390.0,
+      "surveyed": 9664,
+      "coverage": 0.0369,
+      "bin": "bathy_5_5.bin.gz",
+      "src": "bathy_5_5.src.gz",
+      "srcCounts": {
+        "1": 6958,
+        "2": 2706
+      }
+    },
+    {
+      "id": "bathy_6_5",
+      "col": 6,
+      "row": 5,
+      "w": 425,
+      "h": 512,
+      "x": 575490.0,
+      "y": 5719390.0,
+      "surveyed": 187133,
+      "coverage": 0.86,
+      "bin": "bathy_6_5.bin.gz",
+      "src": "bathy_6_5.src.gz",
+      "srcCounts": {
+        "1": 177227,
+        "2": 9906
+      }
+    },
+    {
+      "id": "bathy_0_6",
+      "col": 0,
+      "row": 6,
+      "w": 512,
+      "h": 308,
+      "x": 544770.0,
+      "y": 5714270.0,
+      "surveyed": 148502,
+      "coverage": 0.9417,
+      "bin": "bathy_0_6.bin.gz",
+      "src": "bathy_0_6.src.gz",
+      "srcCounts": {
+        "1": 147801,
+        "2": 701
+      }
+    },
+    {
+      "id": "bathy_1_6",
+      "col": 1,
+      "row": 6,
+      "w": 512,
+      "h": 308,
+      "x": 549890.0,
+      "y": 5714270.0,
+      "surveyed": 153878,
+      "coverage": 0.9758,
+      "bin": "bathy_1_6.bin.gz",
+      "src": "bathy_1_6.src.gz",
+      "srcCounts": {
+        "1": 153878
+      }
+    },
+    {
+      "id": "bathy_2_6",
+      "col": 2,
+      "row": 6,
+      "w": 512,
+      "h": 308,
+      "x": 555010.0,
+      "y": 5714270.0,
+      "surveyed": 150775,
+      "coverage": 0.9561,
+      "bin": "bathy_2_6.bin.gz",
+      "src": "bathy_2_6.src.gz",
+      "srcCounts": {
+        "1": 149747,
+        "2": 1028
+      }
+    },
+    {
+      "id": "bathy_3_6",
+      "col": 3,
+      "row": 6,
+      "w": 512,
+      "h": 308,
+      "x": 560130.0,
+      "y": 5714270.0,
+      "surveyed": 27193,
+      "coverage": 0.1724,
+      "bin": "bathy_3_6.bin.gz",
+      "src": "bathy_3_6.src.gz",
+      "srcCounts": {
+        "1": 6699,
+        "2": 20494
+      }
+    },
+    {
+      "id": "bathy_6_6",
+      "col": 6,
+      "row": 6,
+      "w": 425,
+      "h": 308,
+      "x": 575490.0,
+      "y": 5714270.0,
+      "surveyed": 83509,
+      "coverage": 0.638,
+      "bin": "bathy_6_6.bin.gz",
+      "src": "bathy_6_6.src.gz",
+      "srcCounts": {
+        "1": 82012,
+        "2": 1497
+      }
+    }
+  ],
+  "source": {
+    "dtype": "uint8",
+    "nodata": 0,
+    "legend": {
+      "0": "none",
+      "1": "NONNA-10",
+      "2": "NONNA-100"
+    },
+    "confidence": {
+      "1": "high",
+      "2": "low"
+    },
+    "scoreTiers": [
+      1
+    ]
+  }
+}
