@@ -3,7 +3,7 @@ import { loadManifest, loadTile } from './tiles.js'
 import { lonLatToUtm, utmToLonLat, fmtDepth } from './proj.js'
 import { useGeolocation } from './useGeolocation.js'
 import { SPECIES } from '../scoring/species.js'
-import { computeSpots } from '../scoring/score.js'
+import { computeSpots, buildHeat } from '../scoring/score.js'
 import { loadTides, phaseNow } from '../tides/tides.js'
 import TideStrip from '../tides/TideStrip.jsx'
 import SpotCard from './SpotCard.jsx'
@@ -25,12 +25,15 @@ export default function ChartCanvas() {
   const pinchRef = useRef(null)             // { dist, cx, cy }
   const drawScheduled = useRef(false)
   const epsgRef = useRef(32609)
-  const spotsRef = useRef([])
+  const spotsRef = useRef([])        // full scored pool for the active species
+  const visRef = useRef([])          // top spots within the current viewport (re-ranked)
   const speciesRef = useRef(null)
   const activeSpotRef = useRef(null)
   const spotsCacheRef = useRef({})
   const speciesKeyRef = useRef(null)
   const tilesLoadedRef = useRef(false)
+  const heatRef = useRef([])
+  const heatCacheRef = useRef({})
 
   const { pos, error: gpsError, request: requestGps } = useGeolocation()
   const posRef = useRef(null)
@@ -59,6 +62,11 @@ export default function ChartCanvas() {
   const [showPlan, setShowPlan] = useState(false)
   const [allSpots, setAllSpots] = useState({})
   const [planBuilding, setPlanBuilding] = useState(false)
+  const [showHeat, setShowHeat] = useState(false)
+  const [zoneSpots, setZoneSpots] = useState(null)   // ad-hoc "rescore this view" result
+  const [zoneScoring, setZoneScoring] = useState(false)
+  const zoneRef = useRef(null)
+  useEffect(() => { zoneRef.current = zoneSpots; scheduleDraw() }, [zoneSpots])
   const catchesRef = useRef([])
   const tideRef = useRef(null)
 
@@ -110,7 +118,7 @@ export default function ChartCanvas() {
       const out = {}
       for (const s of SPECIES) {
         if (!spotsCacheRef.current[s.key]) {
-          try { spotsCacheRef.current[s.key] = computeSpots(man, tilesArr, s) }
+          try { spotsCacheRef.current[s.key] = computeSpots(man, tilesArr, s, { maxSpots: 40, minDistM: 130 }) }
           catch (e) { spotsCacheRef.current[s.key] = [] }
         }
         out[s.key] = spotsCacheRef.current[s.key]
@@ -136,6 +144,45 @@ export default function ChartCanvas() {
     centerOn(spot.lat, spot.lon)
   }
 
+  // Top pool spots inside the current viewport, re-ranked for this zone.
+  function visibleSpots() {
+    const man = manifestRef.current, wrap = wrapRef.current
+    if (!man || !wrap) return []
+    const pool = spotsRef.current
+    if (!pool.length) return []
+    const v = viewRef.current, cw = wrap.clientWidth, ch = wrap.clientHeight
+    const inView = pool.filter((s) => {
+      const px = (s.fx + 0.5) * v.scale + v.tx, py = (s.fy + 0.5) * v.scale + v.ty
+      return px >= -8 && py >= -8 && px <= cw + 8 && py <= ch + 8
+    })
+    if (!inView.length) return []
+    const max = Math.max(...inView.map((s) => s.score))
+    return inView.sort((a, b) => b.score - a.score).slice(0, 12)
+      .map((s, i) => ({ ...s, rank: i + 1, rel: max > 0 ? s.score / max : 0 }))
+  }
+
+  // Re-score ONLY the current viewport (finds local structure that missed the global
+  // cut). Absolute scores preserved, so zones are comparable.
+  function rescoreZone() {
+    const man = manifestRef.current, wrap = wrapRef.current, sp = speciesRef.current
+    if (!man || !wrap || !sp) return
+    const v = viewRef.current
+    const bounds = {
+      x0: Math.floor((0 - v.tx) / v.scale), x1: Math.ceil((wrap.clientWidth - v.tx) / v.scale),
+      y0: Math.floor((0 - v.ty) / v.scale), y1: Math.ceil((wrap.clientHeight - v.ty) / v.scale),
+    }
+    setZoneScoring(true)
+    setActiveSpot(null)
+    setTimeout(() => {
+      try {
+        const list = computeSpots(man, [...tilesRef.current.values()], sp,
+          { bounds, minScore: 0.12, maxSpots: 8, minDistM: 90 })
+        setZoneSpots(list)
+      } catch (e) { console.warn('zone rescore failed', e); setZoneSpots([]) }
+      setZoneScoring(false)
+    }, 30)
+  }
+
   useEffect(() => {
     posRef.current = pos
     if (pos) setGpsState('active')
@@ -146,8 +193,26 @@ export default function ChartCanvas() {
   useEffect(() => { activeSpotRef.current = activeSpot; scheduleDraw() }, [activeSpot])
   useEffect(() => {
     speciesKeyRef.current = speciesKey
+    setZoneSpots(null)
     runScoring(speciesKey)
   }, [speciesKey])
+
+  // (re)build the heat overlay when it's toggled or the species changes
+  useEffect(() => {
+    const man = manifestRef.current
+    if (!showHeat || !speciesKey || !man || !tilesLoadedRef.current) { heatRef.current = []; scheduleDraw(); return }
+    if (heatCacheRef.current[speciesKey]) { heatRef.current = heatCacheRef.current[speciesKey]; scheduleDraw(); return }
+    const sp = SPECIES.find((s) => s.key === speciesKey)
+    let cancelled = false
+    const id = setTimeout(() => {
+      try {
+        const h = buildHeat(man, [...tilesRef.current.values()], sp)
+        heatCacheRef.current[speciesKey] = h
+        if (!cancelled) { heatRef.current = h; scheduleDraw() }
+      } catch (e) { console.warn('heat failed', e) }
+    }, 30)
+    return () => { cancelled = true; clearTimeout(id) }
+  }, [showHeat, speciesKey])
 
   function runScoring(key) {
     const man = manifestRef.current
@@ -160,7 +225,7 @@ export default function ChartCanvas() {
     // defer so the "finding spots" spinner paints before the heavy sync compute
     setTimeout(() => {
       try {
-        const list = computeSpots(man, [...tilesRef.current.values()], sp)
+        const list = computeSpots(man, [...tilesRef.current.values()], sp, { maxSpots: 40, minDistM: 130 })
         spotsCacheRef.current[key] = list
         setSpots(list)
       } catch (e) { console.warn('scoring failed', e) }
@@ -202,6 +267,10 @@ export default function ChartCanvas() {
     for (const { t, canvas: tc } of tilesRef.current.values()) {
       ctx.drawImage(tc, t.col * T, t.row * T)
     }
+    // heat overlay (score field for the active species), under the pins
+    for (const h of heatRef.current) {
+      ctx.drawImage(h.canvas, h.col * T, h.row * T)
+    }
 
     // GPS own-ship marker (screen space)
     const p = posRef.current
@@ -242,25 +311,31 @@ export default function ChartCanvas() {
     ctx.fillText(nice >= 1000 ? `${nice / 1000} km` : `${nice} m`, bx, by - 9)
     ctx.shadowBlur = 0
 
-    // ranked spot pins for the active species
+    // ranked spot pins — zone rescore result if present, else the pool re-ranked
+    // to the current viewport.
     const sp = speciesRef.current
-    const spotList = spotsRef.current
-    if (sp && spotList.length) {
+    const isZone = !!(zoneRef.current && zoneRef.current.length)
+    const shown = isZone ? zoneRef.current : (sp ? visibleSpots() : [])
+    visRef.current = shown
+    if (sp && shown.length) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
       ctx.font = '700 12px -apple-system, system-ui, sans-serif'
       const active = activeSpotRef.current
-      for (const s of spotList) {
+      for (const s of shown) {
         const px = (s.fx + 0.5) * scale + tx
         const py = (s.fy + 0.5) * scale + ty
         if (px < -24 || py < -24 || px > cw + 24 || py > ch + 24) continue
         const r = s.rank === 1 ? 13 : 10
-        if (active && active.rank === s.rank) {
+        if (active && active.fx === s.fx && active.fy === s.fy) {
           ctx.beginPath(); ctx.arc(px, py, r + 5, 0, Math.PI * 2)
           ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
         }
         ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2)
         ctx.fillStyle = sp.color; ctx.fill()
-        ctx.lineWidth = 2; ctx.strokeStyle = '#06101a'; ctx.stroke()
+        // zone pins get a dashed white ring to show they're an ad-hoc rescore
+        ctx.lineWidth = 2; ctx.strokeStyle = isZone ? '#fff' : '#06101a'
+        if (isZone) ctx.setLineDash([3, 3])
+        ctx.stroke(); ctx.setLineDash([])
         ctx.fillStyle = '#06101a'; ctx.fillText(String(s.rank), px, py + 0.5)
       }
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
@@ -423,9 +498,9 @@ export default function ChartCanvas() {
     const v = viewRef.current
 
     // spot pins first — tap one to open its card
-    if (speciesRef.current && spotsRef.current.length) {
+    if (speciesRef.current && visRef.current.length) {
       let best = null, bestD = 1e9
-      for (const s of spotsRef.current) {
+      for (const s of visRef.current) {
         const px = (s.fx + 0.5) * v.scale + v.tx
         const py = (s.fy + 0.5) * v.scale + v.ty
         const d = Math.hypot(px - sx, py - sy)
@@ -497,11 +572,24 @@ export default function ChartCanvas() {
             <span className="dot" style={{ background: s.color }} />{s.label}
           </button>
         ))}
+        {speciesKey && (
+          <button className={`chip ${showHeat ? 'active' : ''}`} onClick={() => setShowHeat((v) => !v)}>
+            Heat
+          </button>
+        )}
+        {speciesKey && !zoneSpots && (
+          <button className="chip" onClick={rescoreZone} disabled={zoneScoring}>
+            {zoneScoring ? 'scoring…' : 'Rescore zone'}
+          </button>
+        )}
+        {zoneSpots && (
+          <button className="chip active" onClick={() => setZoneSpots(null)}>
+            Zone ✕ ({zoneSpots.length})
+          </button>
+        )}
         {scoring && <span className="chip-status">finding spots…</span>}
-        {!scoring && speciesKey && spots.length > 0 &&
-          <span className="chip-status">{spots.length} spots · tap a pin</span>}
-        {!scoring && speciesKey && spots.length === 0 &&
-          <span className="chip-status">no strong spots in survey</span>}
+        {!scoring && speciesKey && !zoneSpots &&
+          <span className="chip-status">tap a pin · zoom re-ranks</span>}
       </div>
 
       <div className={`chart-legend ${legendOpen ? '' : 'collapsed'}`}>

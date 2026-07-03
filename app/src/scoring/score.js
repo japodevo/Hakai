@@ -29,6 +29,8 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
   const scoreTiers = manifest.source ? manifest.source.scoreTiers : null
   const sc = species.scoring
   const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency + sc.weights.flatness) || 1
+  const minScore = opts.minScore != null ? opts.minScore : PEAK_MIN_SCORE
+  const B = opts.bounds || null   // {x0,y0,x1,y1} in full-raster cells; only peaks inside
 
   const candidates = []
   for (const tile of tiles) {
@@ -52,7 +54,9 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       for (let x = 1; x < t.w - 1; x++) {
         const i = y * t.w + x
         const s = S[i]
-        if (s < PEAK_MIN_SCORE) continue
+        if (s < minScore) continue
+        const FX = t.col * T + x, FY = t.row * T + y
+        if (B && (FX < B.x0 || FX > B.x1 || FY < B.y0 || FY > B.y1)) continue
         let isMax = true
         for (let dy = -1; dy <= 1 && isMax; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
@@ -61,7 +65,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
         }
         if (!isMax) continue
         candidates.push({
-          fx: t.col * T + x, fy: t.row * T + y, s, dM: dmM[i],
+          fx: FX, fy: FY, s, dM: dmM[i],
           prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i],
         })
       }
@@ -115,4 +119,66 @@ export function rationale(species, spot, depthStr) {
     .replace('{structure}', spot.structure)
     .replace('{depth}', depthStr)
     .replace('{tide}', tideHint(species))
+}
+
+// Why this spot scored: name the terrain drivers that mattered most for this species.
+export function explain(species, spot) {
+  const w = species.scoring.weights, c = spot.comp
+  const drivers = [
+    { t: 'a pinnacle standing proud of the bottom', s: c.prom * w.prominence },
+    { t: 'a steep drop-off right alongside', s: c.adj * w.adjacency },
+    { t: 'steep, broken relief', s: c.slope * w.slope },
+    { t: 'a clean bench/flat', s: c.flat * w.flatness },
+  ].sort((a, b) => b.s - a.s)
+  const top = drivers.filter((d) => d.s > 0.06).slice(0, 2).map((d) => d.t)
+  const near = Math.abs(spot.depthM - species.scoring.depthMeanM) <= species.scoring.depthSigmaM
+  const bits = []
+  if (top.length) bits.push(top.join(' with '))
+  if (near) bits.push(`in the ~${Math.round(species.scoring.depthMeanM)} m band ${species.label.toLowerCase()} favour`)
+  return bits.length ? `Picked for ${bits.join(', ')}.` : 'Structure inside the target depth band.'
+}
+
+// --- heat map: the full scoring surface for a species -----------------------
+function heatColor(s) {
+  const a = Math.max(0, Math.min(1, (s - 0.12) / 0.45)) * 190   // fade in with score
+  const t = Math.max(0, Math.min(1, (s - 0.12) / 0.5))          // teal -> yellow -> red
+  let r, g, b
+  if (t < 0.5) { const u = t / 0.5; r = 60 + u * 180; g = 195; b = 130 - u * 100 }
+  else { const u = (t - 0.5) / 0.5; r = 240; g = 200 - u * 150; b = 30 }
+  return [r, g, b, a]
+}
+
+// Returns per-tile heat overlays [{col,row,w,h,canvas}] for the species score field.
+export function buildHeat(manifest, tiles, species) {
+  const depth = manifest.depth, resM = manifest.res[0]
+  const scoreTiers = manifest.source ? manifest.source.scoreTiers : null
+  const sc = species.scoring
+  const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency + sc.weights.flatness) || 1
+  const out = []
+  for (const tile of tiles) {
+    const { t, depths, src } = tile
+    const { dmM, scoreable, promN, slopeN, adjN, flatN } =
+      analyzeTile(depths, src, t.w, t.h, { nodata: depth.nodata, scale: depth.scale, resM, scoreTiers })
+    const canvas = document.createElement('canvas')
+    canvas.width = t.w; canvas.height = t.h
+    const ctx = canvas.getContext('2d')
+    const img = ctx.createImageData(t.w, t.h)
+    let any = false
+    for (let i = 0; i < dmM.length; i++) {
+      if (!scoreable[i]) continue
+      const d = dmM[i]
+      const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
+      const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
+        sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
+      const [r, gg, b, a] = heatColor((0.4 + 0.6 * g) * terr)
+      if (a <= 1) continue
+      const o = i * 4
+      img.data[o] = r; img.data[o + 1] = gg; img.data[o + 2] = b; img.data[o + 3] = a
+      any = true
+    }
+    if (!any) continue
+    ctx.putImageData(img, 0, 0)
+    out.push({ col: t.col, row: t.row, w: t.w, h: t.h, canvas })
+  }
+  return out
 }

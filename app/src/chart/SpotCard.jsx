@@ -1,6 +1,15 @@
 import { fmtDepth } from './proj.js'
-import { rationale, tideHint } from '../scoring/score.js'
+import { rationale, tideHint, explain } from '../scoring/score.js'
 import { nextWindow, fmtTime } from '../tides/tides.js'
+
+function Bar({ label, v }) {
+  return (
+    <div className="spot-bar">
+      <span>{label}</span>
+      <i><b style={{ width: `${Math.round(Math.max(0, Math.min(1, v)) * 100)}%` }} /></i>
+    </div>
+  )
+}
 
 // Bottom-sheet card for a ranked spot: depth, timed tide window, rationale, tactic,
 // an in/out-of-season badge, and the regs + not-for-nav caveats.
@@ -43,6 +52,12 @@ export default function SpotCard({ spot, species, units, tide, noRigger, onToggl
       </div>
 
       <div className="spot-why">{rationale(species, spot, depthStr)}</div>
+      <div className="spot-explain">{explain(species, spot)}</div>
+      <div className="spot-bars">
+        <Bar label="Prominence" v={spot.comp.prom} />
+        <Bar label="Drop-off" v={spot.comp.adj} />
+        <Bar label="Slope" v={spot.comp.slope} />
+      </div>
 
       {tactic && (
         <div className="spot-tactic">
@@ -56,9 +71,14 @@ export default function SpotCard({ spot, species, units, tide, noRigger, onToggl
         Gear: <b>{noRigger ? 'no downriggers' : 'downriggers'}</b> · tap to switch
       </button>
 
+      <div className="spot-score">
+        <b>{Math.round(spot.score * 100)}</b><span>/100 structure score</span>
+        <em>· {Math.round(spot.rel * 100)}% of best in view</em>
+      </div>
+
       <div className="spot-note">
-        ⚠ Not for navigation. Structure grade: {Math.round(spot.rel * 100)}% of the day's best.
-        {species.regsNote ? ` Regs: ${species.regsNote.slice(0, 180)}…` : ' Verify current DFO regs before you fish.'}
+        ⚠ Not for navigation. Absolute score compares zone-to-zone (same species).
+        {species.regsNote ? ` Regs: ${species.regsNote.slice(0, 160)}…` : ' Verify current DFO regs before you fish.'}
       </div>
     </div>
   )
