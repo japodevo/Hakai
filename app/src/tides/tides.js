@@ -3,12 +3,21 @@
 // tide-change (around each high & low) and moving-water (max-flow between them) —
 // then rank them per species from its tidePhaseWeight.
 //
-// Water-level hi/lo is a proxy for CURRENT: in a strong passage like Hakai, current
-// slack lags the height turn by ~20-60 min, so slack windows are approximate.
+// Water-level hi/lo is a proxy for CURRENT. Two corrections applied:
+//  * SLACK LAG — in a strong passage like Hakai, the current keeps running after the
+//    height turns; slack water arrives ~20-60 min later. All current windows (slack
+//    AND max-flow) are shifted by SLACK_LAG_MIN after the height extremes.
+//  * SPRING/NEAP — window strength scales with the range of each individual tide:
+//    a big spring exchange moves more bait (stronger, longer moving-water windows;
+//    shorter slacks) than a lazy neap.
 const BASE = import.meta.env.BASE_URL
 const MIN = 60000
-const SLACK_HALF = 35 * MIN     // +/- around a high/low
-const FLOW_HALF = 60 * MIN      // +/- around the mid-tide max-flow
+const SLACK_HALF = 35 * MIN      // +/- around a current slack (before spring/neap scaling)
+const FLOW_HALF = 60 * MIN       // +/- around the mid-tide max-flow (before scaling)
+export const SLACK_LAG_MIN = 40  // current slack ≈ this many min AFTER the height turn
+const LAG = SLACK_LAG_MIN * MIN
+const REF_RANGE_M = 3.0          // "typical" Hakai exchange; strength = range / this
+const STR_MIN = 0.7, STR_MAX = 1.25
 
 export async function loadTides() {
   try {
@@ -42,28 +51,49 @@ export function fmtTime(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+// Strength of the exchange between two adjacent hi/lo events (spring vs neap),
+// normalised so a typical Hakai tide ≈ 1.
+function exchangeStrength(a, b) {
+  const range = Math.abs((b?.v ?? 0) - (a?.v ?? 0))
+  return Math.min(STR_MAX, Math.max(STR_MIN, range / REF_RANGE_M))
+}
+
 // All candidate fishing windows for a species, weighted by its tide-phase prefs.
+// Times are CURRENT times (height extremes shifted by the slack lag).
 export function speciesWindows(tide, species) {
   if (!tide || !tide.hilo || tide.hilo.length < 2) return []
   const w = species.scoring.tidePhaseWeight
   const changeW = Math.max(w.change || 0, w.slack || 0)
   const out = []
-  for (const e of tide.hilo) {
+  for (let i = 0; i < tide.hilo.length; i++) {
+    const e = tide.hilo[i]
+    // slack strength from the bigger of the two adjacent exchanges: a spring tide
+    // rips harder, so its slack is briefer.
+    const s = Math.max(
+      exchangeStrength(tide.hilo[i - 1], e),
+      exchangeStrength(e, tide.hilo[i + 1]))
+    const half = SLACK_HALF / s
+    const c = e.t + LAG                       // current slack lags the height turn
     out.push({
-      start: e.t - SLACK_HALF, end: e.t + SLACK_HALF, center: e.t,
-      phase: 'change', weight: changeW,
+      start: c - half, end: c + half, center: c,
+      phase: 'change', weight: changeW, strength: s,
       label: (e.type === 'high' ? 'High' : 'Low') + ' slack / turn',
     })
   }
   for (let i = 0; i < tide.hilo.length - 1; i++) {
     const a = tide.hilo[i], b = tide.hilo[i + 1]
-    const mid = (a.t + b.t) / 2
+    const s = exchangeStrength(a, b)
+    const mid = (a.t + b.t) / 2 + LAG         // max flow shifts with the slacks
+    const half = FLOW_HALF * s                // spring tide → longer productive push
     const rising = b.v > a.v
     const phase = rising ? 'flood' : 'ebb'
     out.push({
-      start: mid - FLOW_HALF, end: mid + FLOW_HALF, center: mid,
-      phase, weight: Math.max(w[phase] || 0, 0.5 * (w.maxFlow || 0)),
-      label: (rising ? 'Flood' : 'Ebb') + ' — moving water',
+      start: mid - half, end: mid + half, center: mid,
+      phase, strength: s,
+      // moving-water windows also score by exchange strength (neap ebb ≠ spring ebb)
+      weight: Math.max(w[phase] || 0, 0.5 * (w.maxFlow || 0)) * s,
+      label: (rising ? 'Flood' : 'Ebb') + ' — moving water' +
+        (s >= 1.12 ? ' (big tide)' : s <= 0.78 ? ' (soft neap)' : ''),
     })
   }
   return out.sort((x, y) => x.start - y.start)
@@ -106,17 +136,19 @@ export function referenceNow(tide) {
 }
 
 // The tide phase at a moment (for auto-tagging a catch): high/low slack, flood, ebb.
+// Uses CURRENT timing (height extremes + slack lag), matching speciesWindows.
 export function phaseNow(tide, now) {
   if (!tide || !tide.hilo || tide.hilo.length < 2) return null
+  const tn = now - LAG   // compare in height-time space
   let near = null, nd = Infinity
   for (const e of tide.hilo) {
-    const d = Math.abs(e.t - now)
+    const d = Math.abs(e.t - tn)
     if (d < nd) { nd = d; near = e }
   }
   if (near && nd <= SLACK_HALF) return `${near.type === 'high' ? 'high' : 'low'} slack`
   let prev = null, next = null
   for (const e of tide.hilo) {
-    if (e.t <= now) prev = e
+    if (e.t <= tn) prev = e
     else { next = e; break }
   }
   if (prev && next) return next.v > prev.v ? 'flood' : 'ebb'

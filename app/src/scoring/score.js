@@ -66,8 +66,22 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
           }
         }
         if (!isMax) continue
+        // drop aspect: bearing toward the deepest nearby cell — the side the bottom
+        // falls away on. Drives the flood/ebb "current play" note on the spot card.
+        let bd = -Infinity, adx = 0, ady = -1
+        for (let dy2 = -3; dy2 <= 3; dy2++) {
+          for (let dx2 = -3; dx2 <= 3; dx2++) {
+            if (!dx2 && !dy2) continue
+            const xx = x + dx2, yy = y + dy2
+            if (xx < 0 || yy < 0 || xx >= t.w || yy >= t.h) continue
+            const dd = dmM[yy * t.w + xx]
+            if (dd > bd) { bd = dd; adx = dx2; ady = dy2 }
+          }
+        }
+        // grid: +x = east, +y = south (row-down in a north-up UTM raster)
+        const dropDirDeg = (Math.atan2(adx, -ady) * 180 / Math.PI + 360) % 360
         candidates.push({
-          fx: FX, fy: FY, s, dM: dmM[i],
+          fx: FX, fy: FY, s, dM: dmM[i], dropDirDeg,
           prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i],
         })
       }
@@ -97,9 +111,31 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       score: c.s,
       rel: maxScore > 0 ? c.s / maxScore : 0,   // 0..1 relative to the top spot
       structure,
+      dropDirDeg: c.dropDirDeg,
       comp: { prom: c.prom, slope: c.slope, adj: c.adj, flat: c.flat },
     }
   })
+}
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+export function compass(deg) {
+  return COMPASS[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
+}
+
+// How to play the current on this spot: uses the drop aspect (which side falls away)
+// plus the species' tide temperament. Rule-of-thumb positioning, not hydrodynamics.
+export function currentPlay(species, spot) {
+  if (spot.dropDirDeg == null) return null
+  const deep = compass(spot.dropDirDeg)
+  const shallow = compass(spot.dropDirDeg + 180)
+  const w = species.scoring.tidePhaseWeight || {}
+  const slackFirst = (w.slack || 0) >= Math.max(w.flood || 0, w.ebb || 0)
+  if (slackFirst) {
+    return `Bottom falls away to the ${deep}. At slack sit right on the peak — that's the pounce window; ` +
+      `once the current builds, tuck into the ${deep} face out of the main flow and work the ledges.`
+  }
+  return `Bottom falls away to the ${deep}. On moving water, set up up-current and present along the ` +
+    `${shallow}→${deep} lip so bait sweeps over the edge; the down-current side of the ${spot.structure} holds the ambush seam.`
 }
 
 // Season fit: 1 in-season, tapering to 0.5 out of season (still fishable structure).

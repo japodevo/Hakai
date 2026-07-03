@@ -25,9 +25,15 @@ on:
   schedule:
     - cron: "17 14 * * 1" # Mondays 14:17 UTC (~07:17 Pacific)
   push:
-    # self-test: any change to this automation runs it once end-to-end
+    # CI/CD: app or pipeline changes on the default branch redeploy automatically
+    # (the sanity gates below stop a broken build from ever reaching the live site);
+    # changes to this automation itself also self-test end-to-end.
+    branches:
+      - claude/hakai-structure-finder-setup-liw7xv
     paths:
       - ".github/workflows/refresh-and-deploy.yml"
+      - "app/**"
+      - "pipeline/**"
 
 permissions:
   contents: write # push the built site to the gh-pages branch
@@ -66,6 +72,11 @@ jobs:
           TO=$(date -u -d "+${DAYS} days" +%F)
           echo "fetching tides $FROM → $TO"
           python pipeline/fetch_tides.py --from "$FROM" --to "$TO"
+
+      # Informational only (never blocks deploy): does IWLS have real CURRENT
+      # prediction stations near the Pass? See pipeline/find_current_stations.py.
+      - name: Probe for DFO current stations near Hakai
+        run: python pipeline/find_current_stations.py || true
 
       - name: Sanity-check tides
         run: |

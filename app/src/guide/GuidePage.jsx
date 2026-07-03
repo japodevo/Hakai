@@ -19,6 +19,8 @@ const GLOSSARY = [
   ['Ebb', 'The outgoing (falling) tide — water draining out.'],
   ['Tide change', 'The transition around a high or low when current is turning. Salmon often feed hardest here.'],
   ['Max flow / moving water', 'The middle of a tide, halfway between high and low, when current runs hardest. It sweeps bait onto structure.'],
+  ['Slack lag', 'In a strong passage the water keeps moving after the tide height turns — current slack arrives ~40 min after the high/low in the tide table. The app shifts all its windows to current time for you.'],
+  ['Spring / neap tides', 'Around full and new moon (springs) the tide range is big and currents rip; at quarter moons (neaps) both are gentle. The app scores a big spring push higher than a soft neap one.'],
   ['Chart datum', 'The zero line depths are measured from (roughly the lowest tide). Real water is usually deeper than the number by the tide height.'],
   ['Mooching', 'Slow-trolling or drifting a weighted, cut-bait or whole herring so it spins — a classic no-downrigger salmon method.'],
   ['Jigging', 'Dropping a heavy metal lure to the bottom and working it up-and-down. Deadly on lingcod and rockfish over structure.'],

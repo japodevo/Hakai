@@ -105,6 +105,7 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
 
       <div className="tide-hilo">
         {hilo.map((e, i) => <span key={i}>{e.type === 'high' ? 'H' : 'L'} {fmtTime(e.t)}</span>)}
+        <span className="tide-lagnote">current turns ~40 min after H/L</span>
       </div>
     </div>
   )

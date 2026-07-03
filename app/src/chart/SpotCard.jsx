@@ -1,6 +1,6 @@
 import { fmtDepth } from './proj.js'
-import { rationale, tideHint, explain, liveScore } from '../scoring/score.js'
-import { nextWindow, fmtTime, tideFitAt } from '../tides/tides.js'
+import { rationale, tideHint, explain, liveScore, currentPlay } from '../scoring/score.js'
+import { nextWindow, fmtTime, tideFitAt, SLACK_LAG_MIN } from '../tides/tides.js'
 
 function Bar({ label, v }) {
   return (
@@ -58,6 +58,12 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
 
       <div className="spot-why">{rationale(species, spot, depthStr)}</div>
       <div className="spot-explain">{explain(species, spot)}</div>
+      {currentPlay(species, spot) && (
+        <div className="spot-current">
+          <span className="k">Current play</span> {currentPlay(species, spot)}
+          {nw ? ` Windows already allow the ~${SLACK_LAG_MIN} min current lag behind the tide table.` : ''}
+        </div>
+      )}
       <div className="spot-bars">
         <Bar label="Prominence" v={spot.comp.prom} />
         <Bar label="Drop-off" v={spot.comp.adj} />
