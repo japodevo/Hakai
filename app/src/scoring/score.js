@@ -30,7 +30,8 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
   const epsg = parseInt(String(manifest.crs).match(/(\d+)/)[1], 10)
   const scoreTiers = manifest.source ? manifest.source.scoreTiers : null
   const sc = species.scoring
-  const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency + sc.weights.flatness) || 1
+  const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency +
+    sc.weights.flatness + (sc.weights.current || 0)) || 1
   const minScore = opts.minScore != null ? opts.minScore : PEAK_MIN_SCORE
   const B = opts.bounds || null   // {x0,y0,x1,y1} in full-raster cells; only peaks inside
 
@@ -43,7 +44,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
   const candidates = []
   for (const tile of tiles) {
     const { t, depths, src } = tile
-    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN } =
+    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN } =
       analyzeTile(depths, src, t.w, t.h, { nodata: depth.nodata, scale: depth.scale, resM, scoreTiers })
 
     const S = new Float32Array(t.w * t.h)
@@ -52,7 +53,8 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       const d = dmM[i]
       const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
       const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
-        sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
+        sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i] +
+        (sc.weights.current || 0) * flowN[i]) / wsum
       const bFit = ((bp.rock || 0) * rugosN[i] + (bp.soft || 0) * (1 - rugosN[i])) / maxPref
       // Depth gates harder now (0.2..1.0) so species with different depth bands pick
       // genuinely different spots instead of all landing on the same big structure.
@@ -90,7 +92,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
         const dropDirDeg = (Math.atan2(adx, -ady) * 180 / Math.PI + 360) % 360
         candidates.push({
           fx: FX, fy: FY, s, dM: dmM[i], dropDirDeg,
-          prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i], rugos: rugosN[i],
+          prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i], rugos: rugosN[i], flow: flowN[i],
         })
       }
     }
@@ -120,7 +122,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       rel: maxScore > 0 ? c.s / maxScore : 0,   // 0..1 relative to the top spot
       structure,
       dropDirDeg: c.dropDirDeg,
-      comp: { prom: c.prom, slope: c.slope, adj: c.adj, flat: c.flat, rugos: c.rugos },
+      comp: { prom: c.prom, slope: c.slope, adj: c.adj, flat: c.flat, rugos: c.rugos, flow: c.flow },
     }
   })
 }
@@ -193,6 +195,7 @@ export function explain(species, spot) {
     { t: 'a steep drop-off right alongside', s: c.adj * w.adjacency },
     { t: 'steep, broken relief', s: c.slope * w.slope },
     { t: 'a clean bench/flat', s: c.flat * w.flatness },
+    { t: 'a tide-swept funnel where moving water piles bait', s: (c.flow || 0) * (w.current || 0) },
   ].sort((a, b) => b.s - a.s)
   const top = drivers.filter((d) => d.s > 0.06).slice(0, 2).map((d) => d.t)
   const near = Math.abs(spot.depthM - species.scoring.depthMeanM) <= species.scoring.depthSigmaM
@@ -223,13 +226,14 @@ export function buildHeat(manifest, tiles, species) {
   const depth = manifest.depth, resM = manifest.res[0]
   const scoreTiers = manifest.source ? manifest.source.scoreTiers : null
   const sc = species.scoring
-  const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency + sc.weights.flatness) || 1
+  const wsum = (sc.weights.prominence + sc.weights.slope + sc.weights.adjacency +
+    sc.weights.flatness + (sc.weights.current || 0)) || 1
   const bp = sc.bottom || {}
   const maxPref = Math.max(bp.rock || 0, bp.gravel || 0, bp.soft || 0) || 1
   const out = []
   for (const tile of tiles) {
     const { t, depths, src } = tile
-    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN } =
+    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN } =
       analyzeTile(depths, src, t.w, t.h, { nodata: depth.nodata, scale: depth.scale, resM, scoreTiers })
     const canvas = document.createElement('canvas')
     canvas.width = t.w; canvas.height = t.h
@@ -241,7 +245,8 @@ export function buildHeat(manifest, tiles, species) {
       const d = dmM[i]
       const g = Math.exp(-((d - sc.depthMeanM) ** 2) / (2 * sc.depthSigmaM * sc.depthSigmaM))
       const terr = (sc.weights.prominence * promN[i] + sc.weights.slope * slopeN[i] +
-        sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i]) / wsum
+        sc.weights.adjacency * adjN[i] + sc.weights.flatness * flatN[i] +
+        (sc.weights.current || 0) * flowN[i]) / wsum
       const bFit = ((bp.rock || 0) * rugosN[i] + (bp.soft || 0) * (1 - rugosN[i])) / maxPref
       const [r, gg, b, a] = heatColor((0.2 + 0.8 * g) * terr * (0.55 + 0.45 * bFit))
       if (a <= 1) continue

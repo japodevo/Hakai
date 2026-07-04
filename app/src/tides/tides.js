@@ -38,13 +38,42 @@ function normalize(j) {
     .map((e) => ({ t: Date.parse(e.t), v: e.v, type: e.type }))
     .filter((e) => !Number.isNaN(e.t))
     .sort((a, b) => a.t - b.t)
+  // Robust "big flow" reference: 95th percentile of |dh/dt| across the whole
+  // prefetch, so flowRateAt() ≈ 1 on a ripping spring mid-tide and ~0.5 on a neap.
+  const rates = []
+  for (let i = 1; i < pred.length; i++) {
+    const dt = pred[i].t - pred[i - 1].t
+    if (dt > 0) rates.push(Math.abs(pred[i].v - pred[i - 1].v) / dt)
+  }
+  rates.sort((a, b) => a - b)
+  const flowMax = rates.length ? rates[Math.floor(rates.length * 0.95)] : 0
   return {
     station: j.station || null,
     tripFrom: j.tripFrom, tripTo: j.tripTo,
-    pred, hilo,
+    pred, hilo, flowMax,
     start: pred.length ? pred[0].t : null,
     end: pred.length ? pred[pred.length - 1].t : null,
   }
+}
+
+// Continuous current-speed proxy at CURRENT time t: |dh/dt| of the height curve
+// (lag-shifted), normalised 0..1 against the prefetch's 95th-percentile rate.
+// This is the smooth signal behind "how hard is the water moving right now" —
+// finer than the window boxes, and it distinguishes a spring rip from a neap push.
+export function flowRateAt(tide, t) {
+  const pred = tide?.pred
+  if (!pred || pred.length < 2 || !tide.flowMax) return 0
+  const tt = t - LAG                       // current lags the height curve
+  let lo = 0, hi = pred.length - 1
+  if (tt <= pred[0].t || tt >= pred[hi].t) return 0
+  while (hi - lo > 1) {                    // binary search for the bracketing pair
+    const mid = (lo + hi) >> 1
+    if (pred[mid].t <= tt) lo = mid; else hi = mid
+  }
+  const dt = pred[hi].t - pred[lo].t
+  if (dt <= 0) return 0
+  const rate = Math.abs(pred[hi].v - pred[lo].v) / dt
+  return Math.min(1, rate / tide.flowMax)
 }
 
 export function fmtTime(ms) {
@@ -100,8 +129,9 @@ export function speciesWindows(tide, species) {
 }
 
 // How well time `now` suits fishing this species, 0..1, from the tide alone.
-// Peaks at the centre of a good window and tapers to its edges; 0 when the tide
-// is doing nothing useful. Drives the live pin brightness as you scrub the slider.
+// Two signals, best wins: the labelled windows (slack/turn, moving water), and the
+// CONTINUOUS flow-rate curve for moving-water species — so between window boxes the
+// fit follows the real predicted current instead of snapping to zero.
 export function tideFitAt(tide, species, now) {
   const ws = speciesWindows(tide, species)
   if (!ws.length) return 1
@@ -112,6 +142,9 @@ export function tideFitAt(tide, species, now) {
     const prox = 1 - Math.abs(now - w.center) / half   // 1 at centre → 0 at the edge
     best = Math.max(best, w.weight * (0.55 + 0.45 * prox))
   }
+  const wgt = species.scoring.tidePhaseWeight || {}
+  const movingW = Math.max(wgt.flood || 0, wgt.ebb || 0)
+  if (movingW > 0) best = Math.max(best, movingW * flowRateAt(tide, now) * 0.9)
   return Math.max(0, Math.min(1, best))
 }
 

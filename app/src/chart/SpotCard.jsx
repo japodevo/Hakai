@@ -71,6 +71,7 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
         <Bar label="Drop-off" v={spot.comp.adj} />
         <Bar label="Slope" v={spot.comp.slope} />
         {spot.comp.rugos != null && <Bar label="Rough bottom" v={spot.comp.rugos} />}
+        {spot.comp.flow != null && <Bar label="Bait funnel" v={spot.comp.flow} />}
       </div>
 
       {tactic && (

@@ -1,4 +1,4 @@
-import { speciesWindows, nextWindow, phaseNow, fmtTime, dayBounds } from './tides.js'
+import { speciesWindows, nextWindow, phaseNow, fmtTime, dayBounds, flowRateAt } from './tides.js'
 import { sunAltitudeDeg, sunTimes } from './sun.js'
 
 // which species a phase favours, weighted by its tide prefs
@@ -69,6 +69,16 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
             fill={shadeSp.color} opacity="0.16" />
         })}
         <path d={path} fill="none" stroke="#8fd0ff" strokeWidth="2" />
+        {/* current speed (|dh/dt|, lag-corrected): the orange pulse along the bottom —
+            bait moves when this is up */}
+        <path d={(() => {
+          const seg = []
+          for (let t = d0; t <= d1; t += 15 * 60000) {
+            const f = flowRateAt(tide, t)
+            seg.push(`${seg.length ? 'L' : 'M'}${X(t).toFixed(1)},${(H - 2 - f * H * 0.42).toFixed(1)}`)
+          }
+          return seg.join(' ')
+        })()} fill="none" stroke="#ff9f43" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.8" />
         {hilo.map((e, i) => <circle key={i} cx={X(e.t)} cy={Y(e.v)} r="3.5" fill="#fff" />)}
         <line x1={X(now)} y1="0" x2={X(now)} y2={H} stroke="#ffcf6b" strokeWidth="1.5" />
       </svg>
@@ -122,6 +132,7 @@ export default function TideStrip({ tide, species, speciesList, refTime, onRefTi
         {(() => { const st = sunTimes(d0, d1); return st.rise ? (
           <span className="tide-sun">☀ {fmtTime(st.rise)}–{st.set ? fmtTime(st.set) : '…'}</span>
         ) : null })()}
+        <span className="tide-flowkey">- - current speed</span>
         <span className="tide-lagnote">current turns ~40 min after H/L</span>
       </div>
     </div>

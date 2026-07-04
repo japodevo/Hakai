@@ -699,7 +699,8 @@ export default function ChartCanvas() {
           title="Game plan">Plan</button>
         <button className={showLog ? 'primary' : ''} onClick={() => setShowLog((v) => !v)}
           title="Catch log">🎣</button>
-        <button className={showTide ? 'primary' : ''} onClick={() => setShowTide((v) => !v)}
+        <button className={showTide ? 'primary' : ''}
+          onClick={() => setShowTide((v) => { if (!v) setRefTime(null); return !v })}
           title="Tides">🌊</button>
         <button onClick={() => setUnits((u) => (u === 'm' ? 'ft' : 'm'))}
           title="Depth units">{units}</button>

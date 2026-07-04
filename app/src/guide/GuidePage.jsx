@@ -23,6 +23,8 @@ const GLOSSARY = [
   ['Spring / neap tides', 'Around full and new moon (springs) the tide range is big and currents rip; at quarter moons (neaps) both are gentle. The app scores a big spring push higher than a soft neap one.'],
   ['First light / low light', 'The grey band around dawn and dusk when salmon feed hardest. The bite score peaks then, drops in flat midday sun, and drops harder in full dark; the tide chart shades night. Lingcod care less — they hunt by sight all day.'],
   ['Rugosity', 'How rough/broken the bottom is. The app measures fine texture in the depth data as a stand-in for rock (rough) vs sand/mud (smooth) — lingcod demand rock, so smooth-bottom spots score down for them. Confirm on your sounder.'],
+  ['Bait funnel', 'Where moving water gets squeezed (a narrows or pass) or forced up and over a rise (upwelling) — bait can\'t fight the current, so it stacks there and the predators follow. The app computes this from the seafloor shape and scores it; the heat map glows on these zones.'],
+  ['Current speed curve', 'The dashed orange pulse on the tide chart — how hard the water is predicted to move at each moment (lag-corrected). Bait funnels fish best while it\'s up; slack-lovers like lingcod fire when it dies.'],
   ['Chart datum', 'The zero line depths are measured from (roughly the lowest tide). Real water is usually deeper than the number by the tide height.'],
   ['Mooching', 'Slow-trolling or drifting a weighted, cut-bait or whole herring so it spins — a classic no-downrigger salmon method.'],
   ['Jigging', 'Dropping a heavy metal lure to the bottom and working it up-and-down. Deadly on lingcod and rockfish over structure.'],

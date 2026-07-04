@@ -41,7 +41,8 @@ export const SPECIES = [
         "prominence": 0.45,
         "slope": 0.5,
         "flatness": 0.15,
-        "adjacency": 0.65
+        "adjacency": 0.65,
+        "current": 0.7
       },
       "bottom": {
         "rock": 0.55,
@@ -153,7 +154,8 @@ export const SPECIES = [
         "prominence": 0.3,
         "slope": 0.35,
         "flatness": 0.1,
-        "adjacency": 0.5
+        "adjacency": 0.5,
+        "current": 0.65
       },
       "bottom": {
         "rock": 0.55,
@@ -268,7 +270,8 @@ export const SPECIES = [
         "prominence": 0.95,
         "slope": 0.8,
         "flatness": 0.1,
-        "adjacency": 0.85
+        "adjacency": 0.85,
+        "current": 0.45
       },
       "bottom": {
         "rock": 1,

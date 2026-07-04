@@ -17,8 +17,33 @@ const ADJ_RADIUS_M = 60
 // carries decimetre-scale texture the 10 m NONNA grid preserves; sand/mud is smooth.
 const RUGOSITY_CAP = 0.5     // m of mean residual relief that reads as fully rocky
 const RUGOSITY_RADIUS_M = 30
+// Current-energy proxies (where tidal FLOW concentrates bait):
+//  * VENTURI — a channel/pass: water stays deep along one axis but shoals across it,
+//    so the same tidal prism squeezes through less cross-section and accelerates.
+//    Measured as (mean depth along best axis − mean depth across it), sampled out to
+//    ~210 m. Nodata samples fall back to the cell's own depth (neutral) so survey
+//    gaps can't fabricate channels.
+//  * UPWELLING — structure standing proud of a LARGE deep neighbourhood (450 m box):
+//    moving water has nowhere to go but up and over, stacking bait on the crest.
+const VENTURI_CAP = 20       // m of along-vs-across depth contrast = full venturi
+const VENTURI_STEP_M = 40, VENTURI_SAMPLES = 5
+const VENTURI_LATTICE = 2    // venturi varies over ~200 m; compute every Nth cell, fill blocks
+const UPWELL_RADIUS_M = 450
+const UPWELL_CAP = 50        // m of large-scale relief = full upwelling potential
+
+// Terrain is species-independent, so memoize per tile (keyed on the decoded depth
+// array) — every species and the heat map reuse one analysis instead of recomputing.
+const _memo = new WeakMap()
 
 export function analyzeTile(depths, src, w, h, opts) {
+  const hit = _memo.get(depths)
+  if (hit) return hit
+  const out = _analyzeTile(depths, src, w, h, opts)
+  _memo.set(depths, out)
+  return out
+}
+
+function _analyzeTile(depths, src, w, h, opts) {
   const { nodata, scale, resM, scoreTiers } = opts
   const n = w * h
   const dmM = new Float32Array(n)         // depth in metres (0 where invalid)
@@ -145,5 +170,44 @@ export function analyzeTile(depths, src, w, h, opts) {
     }
   }
 
-  return { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN }
+  // --- current-energy: venturi (channel squeeze) + upwelling (flow over a rise) ---
+  const vStep = Math.max(1, Math.round(VENTURI_STEP_M / resM))
+  const R2 = Math.max(8, Math.round(UPWELL_RADIUS_M / resM))
+  // axes: E-W, N-S, NE-SW, NW-SE (unit cell offsets)
+  const AXES = [[1, 0], [0, 1], [1, 1], [1, -1]]
+  const flowN = new Float32Array(n)
+  const L = VENTURI_LATTICE
+  for (let y = 0; y < h; y += L) {
+    for (let x = 0; x < w; x += L) {
+      const i = y * w + x
+      if (!hasDepth[i]) continue
+      const d0 = dmM[i]
+      // mean depth along each axis (both directions); nodata/out-of-tile = neutral
+      const am = new Array(4)
+      for (let a = 0; a < 4; a++) {
+        const [ux, uy] = AXES[a]
+        let sum = 0
+        for (let k = 1; k <= VENTURI_SAMPLES; k++) {
+          for (const sgn of [1, -1]) {
+            const xx = x + sgn * k * vStep * ux, yy = y + sgn * k * vStep * uy
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h || !hasDepth[yy * w + xx]) sum += d0
+            else sum += dmM[yy * w + xx]
+          }
+        }
+        am[a] = sum / (2 * VENTURI_SAMPLES)
+      }
+      // best venturi over the two perpendicular pairs: deep along, shallow across
+      const vent = Math.max(am[0] - am[1], am[1] - am[0], am[2] - am[3], am[3] - am[2])
+      const ventN = Math.min(1, Math.max(0, vent / VENTURI_CAP))
+      // upwelling: large-scale prominence (how far this stands above a wide deep box)
+      const bm2 = boxMean(x - R2, y - R2, x + R2, y + R2)
+      const upN = bm2 === bm2 ? Math.min(1, Math.max(0, (bm2 - d0) / UPWELL_CAP)) : 0
+      const f = Math.min(1, 0.6 * ventN + 0.6 * upN)
+      // fill the L×L block (venturi/upwelling vary over hundreds of metres)
+      for (let by = y; by < Math.min(h, y + L); by++)
+        for (let bx = x; bx < Math.min(w, x + L); bx++) flowN[by * w + bx] = f
+    }
+  }
+
+  return { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN }
 }
