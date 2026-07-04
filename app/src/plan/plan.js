@@ -35,7 +35,9 @@ export function buildPlan(spotsBySpecies, tide, speciesList, opts = {}) {
       const band = lightBand(w.center)
       const label = w.label + (band === 'lowLight' ? ' · ☀ prime light' : band === 'night' ? ' · dark' : '')
       const g = groups.get(key) || { start: w.start, end: w.end, center: w.center, label, phase: w.phase, picks: [] }
-      g.picks.push({ species: s, spot: best, score: w.weight * best.rel * lightFit(s, w.center), weight: w.weight, inSeason: inSeason(s, month) })
+      // direction-aware: a flood-collecting spot outranks on flood windows, etc.
+      const dirAff = w.phase === 'flood' ? (best.floodAff ?? 1) : w.phase === 'ebb' ? (best.ebbAff ?? 1) : 1
+      g.picks.push({ species: s, spot: best, score: w.weight * best.rel * lightFit(s, w.center) * dirAff, weight: w.weight, inSeason: inSeason(s, month) })
       groups.set(key, g)
     }
   }

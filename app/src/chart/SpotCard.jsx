@@ -30,7 +30,7 @@ export default function SpotCard({ spot, species, units, tide, now, noRigger, on
 
   const nowMs = now || Date.now()
   const structPct = Math.round(spot.score * 100)
-  const livePct = Math.min(99, Math.round(liveScore(spot.score, species, tide, nowMs) * 100))
+  const livePct = Math.min(99, Math.round(liveScore(spot.score, species, tide, nowMs, spot) * 100))
   const fit = tide ? tideFitAt(tide, species, nowMs) : 1
   const fitWord = !tide ? null : fit >= 0.66 ? 'prime tide' : fit >= 0.33 ? 'fair tide' : 'slack / off-tide'
   const lightWord = { night: 'dark', lowLight: '☀ prime light', day: 'daylight' }[lightBand(nowMs)]

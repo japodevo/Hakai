@@ -25,6 +25,7 @@ const GLOSSARY = [
   ['Rugosity', 'How rough/broken the bottom is. The app measures fine texture in the depth data as a stand-in for rock (rough) vs sand/mud (smooth) — lingcod demand rock, so smooth-bottom spots score down for them. Confirm on your sounder.'],
   ['Bait funnel', 'Where moving water gets squeezed (a narrows or pass) or forced up and over a rise (upwelling) — bait can\'t fight the current, so it stacks there and the predators follow. The app computes this from the seafloor shape and scores it; the heat map glows on these zones.'],
   ['Current speed curve', 'The dashed orange pulse on the tide chart — how hard the water is predicted to move at each moment (lag-corrected). Bait funnels fish best while it\'s up; slack-lovers like lingcod fire when it dies.'],
+  ['Flood spot / ebb spot', 'Many spots only collect bait when the tide runs one way — the direction that arrives from their deep side and pushes bait up onto them. The app estimates this (flood ≈ east-going into the passage, bent along local channels) and drops the bite score on the wrong tide. It\'s a rule of thumb — confirm with the kelp.'],
   ['Chart datum', 'The zero line depths are measured from (roughly the lowest tide). Real water is usually deeper than the number by the tide height.'],
   ['Mooching', 'Slow-trolling or drifting a weighted, cut-bait or whole herring so it spins — a classic no-downrigger salmon method.'],
   ['Jigging', 'Dropping a heavy metal lure to the bottom and working it up-and-down. Deadly on lingcod and rockfish over structure.'],

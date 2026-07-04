@@ -4,12 +4,20 @@
 // from the species profile (and, once a tide prefetch is loaded, timed windows).
 import { analyzeTile } from './terrain.js'
 import { utmToLonLat } from '../chart/proj.js'
-import { tideFitAt } from '../tides/tides.js'
+import { tideFitAt, phaseNow } from '../tides/tides.js'
 import { lightFit } from '../tides/sun.js'
 
 const PEAK_MIN_SCORE = 0.28
 const DEFAULT_MIN_DIST_M = 220
 const DEFAULT_MAX_SPOTS = 12
+
+// Regional flood set: at Hakai the flood pushes IN from Queen Charlotte Sound,
+// roughly east-going through the passage; the ebb drains back west. A labelled
+// rule of thumb (no current stations exist to measure it) — bent to the local
+// channel axis where the venturi scan finds one.
+const REGIONAL_FLOOD_TOWARD_DEG = 90
+
+const angDiff = (a, b) => { const d = Math.abs(((a - b) % 360 + 540) % 360 - 180); return d }
 
 function classify(c) {
   if (c.prom > 0.55 && c.slope > 0.3) return 'pinnacle'
@@ -44,7 +52,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
   const candidates = []
   for (const tile of tiles) {
     const { t, depths, src } = tile
-    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN } =
+    const { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN, ventStr, flowAxisDeg } =
       analyzeTile(depths, src, t.w, t.h, { nodata: depth.nodata, scale: depth.scale, resM, scoreTiers })
 
     const S = new Float32Array(t.w * t.h)
@@ -90,8 +98,26 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
         }
         // grid: +x = east, +y = south (row-down in a north-up UTM raster)
         const dropDirDeg = (Math.atan2(adx, -ady) * 180 / Math.PI + 360) % 360
+        // Direction-aware bait delivery: local flood direction = the regional flood
+        // set, bent onto the channel axis where there is one. A spot collects bait
+        // best on the phase whose flow ARRIVES FROM its deep side (water rides the
+        // deep lane and gets forced up the spot's face). Affinities are normalised
+        // so the better phase = 1; the weaker phase floors at 0.35 (eddies still
+        // deliver some bait both ways).
+        let floodToward = REGIONAL_FLOOD_TOWARD_DEG
+        if (ventStr[i] > 0.25) {
+          const ax = flowAxisDeg[i]
+          floodToward = angDiff(ax, REGIONAL_FLOOD_TOWARD_DEG) <=
+            angDiff(ax + 180, REGIONAL_FLOOD_TOWARD_DEG) ? ax : (ax + 180) % 360
+        }
+        const aff = (fromDeg) => 0.5 + 0.5 * Math.cos((fromDeg - dropDirDeg) * Math.PI / 180)
+        let fA = aff((floodToward + 180) % 360)   // flood arrives from opposite its set
+        let eA = aff(floodToward)                 // ebb runs the reverse
+        const mA = Math.max(fA, eA, 1e-6)
+        fA = Math.max(0.35, fA / mA); eA = Math.max(0.35, eA / mA)
         candidates.push({
           fx: FX, fy: FY, s, dM: dmM[i], dropDirDeg,
+          floodToward, floodAff: fA, ebbAff: eA,
           prom: promN[i], slope: slopeN[i], adj: adjN[i], flat: flatN[i], rugos: rugosN[i], flow: flowN[i],
         })
       }
@@ -122,6 +148,7 @@ export function computeSpots(manifest, tiles, species, opts = {}) {
       rel: maxScore > 0 ? c.s / maxScore : 0,   // 0..1 relative to the top spot
       structure,
       dropDirDeg: c.dropDirDeg,
+      floodToward: c.floodToward, floodAff: c.floodAff, ebbAff: c.ebbAff,
       comp: { prom: c.prom, slope: c.slope, adj: c.adj, flat: c.flat, rugos: c.rugos, flow: c.flow },
     }
   })
@@ -138,13 +165,22 @@ export function currentPlay(species, spot) {
   if (spot.dropDirDeg == null) return null
   const deep = compass(spot.dropDirDeg)
   const shallow = compass(spot.dropDirDeg + 180)
+  // Which tide direction feeds this spot (rule of thumb: regional flood set bent to
+  // the local channel; bait arrives along the deep lane).
+  let dir = ''
+  if (spot.floodAff != null) {
+    const f = spot.floodAff, e = spot.ebbAff
+    if (f > e * 1.15) dir = `A FLOOD spot — the flood (≈ ${compass(spot.floodToward)}-going here) arrives from its deep ${deep} side and piles bait onto it; expect it quieter on the ebb. `
+    else if (e > f * 1.15) dir = `An EBB spot — the ebb (≈ ${compass(spot.floodToward + 180)}-going here) arrives from its deep ${deep} side and piles bait onto it; expect it quieter on the flood. `
+    else dir = 'Collects bait on both tide directions here. '
+  }
   const w = species.scoring.tidePhaseWeight || {}
   const slackFirst = (w.slack || 0) >= Math.max(w.flood || 0, w.ebb || 0)
   if (slackFirst) {
-    return `Bottom falls away to the ${deep}. At slack sit right on the peak — that's the pounce window; ` +
+    return `${dir}Bottom falls away to the ${deep}. At slack sit right on the peak — that's the pounce window; ` +
       `once the current builds, tuck into the ${deep} face out of the main flow and work the ledges.`
   }
-  return `Bottom falls away to the ${deep}. On moving water, set up up-current and present along the ` +
+  return `${dir}Bottom falls away to the ${deep}. On moving water, set up up-current and present along the ` +
     `${shallow}→${deep} lip so bait sweeps over the edge; the down-current side of the ${spot.structure} holds the ambush seam.`
 }
 
@@ -157,12 +193,19 @@ export function seasonFit(species, timeMs) {
 }
 
 // The live "bite score" for a spot at a moment: its structural score gated by how well
-// the tide, the LIGHT, and the season suit this species right now. This is what the
-// pin/card show, so scrubbing the time slider changes the numbers — dawn on a tide
-// change lights up; flat midday sun at slack goes cold.
-export function liveScore(baseScore, species, tide, timeMs) {
+// the tide, the LIGHT, the season — and, when `spot` is passed, the FLOW DIRECTION —
+// suit this species right now. A flood-collecting shoulder scores full on the flood
+// and drops toward its floor on the ebb, so the same structure reads differently
+// through the day. Dawn on the right tide direction is the jackpot.
+export function liveScore(baseScore, species, tide, timeMs, spot) {
   const tideMult = tide ? (0.35 + 0.65 * tideFitAt(tide, species, timeMs)) : 1
-  return baseScore * tideMult * lightFit(species, timeMs) * seasonFit(species, timeMs)
+  let dirMult = 1
+  if (tide && spot && spot.floodAff != null) {
+    const ph = phaseNow(tide, timeMs)
+    if (ph === 'flood') dirMult = spot.floodAff
+    else if (ph === 'ebb') dirMult = spot.ebbAff
+  }
+  return baseScore * tideMult * dirMult * lightFit(species, timeMs) * seasonFit(species, timeMs)
 }
 
 // A plain-language tide hint from the species' best phases (until timed windows load).

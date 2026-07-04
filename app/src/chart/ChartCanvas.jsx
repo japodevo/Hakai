@@ -381,7 +381,7 @@ export default function ChartCanvas() {
         ctx.stroke(); ctx.setLineDash([])
         // label = live "bite now" score (structure gated by the tide at the slider time),
         // so the number rises in a good window and drops at slack / off-tide.
-        const live = t ? liveScore(s.score, sp, t, effTimeRef.current) : s.score
+        const live = t ? liveScore(s.score, sp, t, effTimeRef.current, s) : s.score
         ctx.fillStyle = '#06101a'
         ctx.fillText(String(Math.min(99, Math.round(live * 100))), px, py + 0.5)
         ctx.globalAlpha = 1

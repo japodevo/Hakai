@@ -176,6 +176,10 @@ function _analyzeTile(depths, src, w, h, opts) {
   // axes: E-W, N-S, NE-SW, NW-SE (unit cell offsets)
   const AXES = [[1, 0], [0, 1], [1, 1], [1, -1]]
   const flowN = new Float32Array(n)
+  const ventStr = new Float32Array(n)      // venturi strength alone (for axis confidence)
+  const flowAxisDeg = new Float32Array(n)  // bearing of the deep/along axis (0..180 ambiguous)
+  // compass bearing of each axis on a north-up grid (+x east, +y south)
+  const AXIS_DEG = [90, 0, 135, 45]        // E-W, N-S, SE-NW, NE-SW
   const L = VENTURI_LATTICE
   for (let y = 0; y < h; y += L) {
     for (let x = 0; x < w; x += L) {
@@ -196,18 +200,26 @@ function _analyzeTile(depths, src, w, h, opts) {
         }
         am[a] = sum / (2 * VENTURI_SAMPLES)
       }
-      // best venturi over the two perpendicular pairs: deep along, shallow across
-      const vent = Math.max(am[0] - am[1], am[1] - am[0], am[2] - am[3], am[3] - am[2])
+      // best venturi over the two perpendicular pairs: deep along, shallow across.
+      // The winning "deep along" axis is the local flow axis — tidal streams run
+      // along the channel, so this is our best offline estimate of flow direction.
+      const pairs = [am[0] - am[1], am[1] - am[0], am[2] - am[3], am[3] - am[2]]
+      let vent = pairs[0], vi = 0
+      for (let p = 1; p < 4; p++) if (pairs[p] > vent) { vent = pairs[p]; vi = p }
       const ventN = Math.min(1, Math.max(0, vent / VENTURI_CAP))
+      const axisDeg = AXIS_DEG[vi]
       // upwelling: large-scale prominence (how far this stands above a wide deep box)
       const bm2 = boxMean(x - R2, y - R2, x + R2, y + R2)
       const upN = bm2 === bm2 ? Math.min(1, Math.max(0, (bm2 - d0) / UPWELL_CAP)) : 0
       const f = Math.min(1, 0.6 * ventN + 0.6 * upN)
       // fill the L×L block (venturi/upwelling vary over hundreds of metres)
       for (let by = y; by < Math.min(h, y + L); by++)
-        for (let bx = x; bx < Math.min(w, x + L); bx++) flowN[by * w + bx] = f
+        for (let bx = x; bx < Math.min(w, x + L); bx++) {
+          const bi = by * w + bx
+          flowN[bi] = f; ventStr[bi] = ventN; flowAxisDeg[bi] = axisDeg
+        }
     }
   }
 
-  return { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN }
+  return { dmM, scoreable, promN, slopeN, adjN, flatN, rugosN, flowN, ventStr, flowAxisDeg }
 }
