@@ -23,7 +23,11 @@ export function useGeolocation() {
           heading: p.coords.heading,
         })
       },
-      (e) => setError(e.message || 'location unavailable'),
+      // plain-English errors (iOS otherwise surfaces raw kCLError strings)
+      (e) => setError(
+        e.code === 1 ? 'location permission denied — allow it in Settings › Safari (or the app) › Location'
+        : e.code === 3 ? 'no fix yet (timed out) — still trying; open sky helps'
+        : 'no GPS fix yet — still trying; works best under open sky (no cell service needed)'),
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 },
     )
   }

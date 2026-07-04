@@ -76,12 +76,17 @@
 .chart-readout .ok { color: #7fd6a0; }
 .chart-readout .muted { color: var(--muted); }
 
+/* bottom-left, above the storage toast, clear of the chips and control stack;
+   tap to dismiss (it re-appears only on a new error) */
 .chart-gps-err {
   position: absolute;
-  top: 12px; left: 12px;
-  background: rgba(60, 30, 20, 0.9);
+  left: 12px; right: 66px;
+  bottom: calc(64px + var(--safe-bottom));
+  max-width: 340px;
+  background: rgba(60, 30, 20, 0.94);
   color: var(--warn); border: 1px solid #5a3a24;
-  padding: 6px 12px; border-radius: 10px; font-size: 13px;
+  padding: 8px 12px; border-radius: 10px; font-size: 12px; line-height: 1.4;
+  z-index: 6;
 }
 
 /* --- species chips (top center) --- */

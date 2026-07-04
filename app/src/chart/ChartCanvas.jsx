@@ -44,6 +44,9 @@ export default function ChartCanvas() {
   // collapsed by default so it never crowds the species chips on a small phone
   const [legendOpen, setLegendOpen] = useState(false)
   const [gpsState, setGpsState] = useState('off')  // off | acquiring | active
+  const [gpsErrDismissed, setGpsErrDismissed] = useState(false)
+  // a NEW error after a dismissal should show again
+  useEffect(() => { if (gpsError) setGpsErrDismissed(false) }, [gpsError])
   const [speciesKey, setSpeciesKey] = useState(null)
   const [spots, setSpots] = useState([])
   const [scoring, setScoring] = useState(false)
@@ -724,7 +727,11 @@ export default function ChartCanvas() {
         </div>
       )}
 
-      {gpsError && <div className="chart-gps-err">GPS: {gpsError}</div>}
+      {gpsError && !gpsErrDismissed && (
+        <div className="chart-gps-err" onClick={() => setGpsErrDismissed(true)}>
+          GPS: {gpsError} <i>(tap to dismiss)</i>
+        </div>
+      )}
 
       {showTide && (
         <TideStrip tide={tide} species={SPECIES.find((s) => s.key === speciesKey) || null}
